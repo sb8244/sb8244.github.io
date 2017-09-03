@@ -1,22 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <title>Blog Name</title>
-  <subtitle>Blog subtitle</subtitle>
-  <id>http://blog.url.com/</id>
-  <link href="http://blog.url.com/"/>
-  <link href="http://blog.url.com/feed.xml" rel="self"/>
+  <title>Stephen Bussey's Software Engineering Blog</title>
+  <id>https://stephenbussey.com</id>
+  <link href="https://stephenbussey.com"/>
+  <link href="https://stephenbussey.com/feed.xml" rel="self"/>
   <updated>2016-05-06T20:00:00-04:00</updated>
   <author>
-    <name>Blog Author</name>
+    <name>Stephen Bussey</name>
   </author>
   <entry>
     <title>Visual Regression Testing in Capybara</title>
-    <link rel="alternate" href="http://blog.url.com/2016/05/07/visual-regression-testing.html"/>
-    <id>http://blog.url.com/2016/05/07/visual-regression-testing.html</id>
+    <link rel="alternate" href="https://stephenbussey.com/2016/05/07/visual-regression-testing.html"/>
+    <id>https://stephenbussey.com/2016/05/07/visual-regression-testing.html</id>
     <published>2016-05-06T20:00:00-04:00</published>
     <updated>2017-09-02T17:16:04-04:00</updated>
     <author>
-      <name>Article Author</name>
+      <name>Stephen Bussey</name>
     </author>
     <content type="html">&lt;p&gt;An interesting topic that is picking up traction with many front-end UI engineers is visual regression testing. Visual regression testing relies on known visual state, which enforces that the application has not visually changed between code changes. Our QA and UI engineering team at SalesLoft recently began to discuss their desire to try this out; I want to share our first iteration.&lt;/p&gt;
 
@@ -87,12 +86,12 @@ cropped_image = Magick::Image.read(image)[0].crop(
   </entry>
   <entry>
     <title>Exceptional Starts with a Choice</title>
-    <link rel="alternate" href="http://blog.url.com/2015/12/03/exceptional-starts-with-a-choice.html"/>
-    <id>http://blog.url.com/2015/12/03/exceptional-starts-with-a-choice.html</id>
+    <link rel="alternate" href="https://stephenbussey.com/2015/12/03/exceptional-starts-with-a-choice.html"/>
+    <id>https://stephenbussey.com/2015/12/03/exceptional-starts-with-a-choice.html</id>
     <published>2015-12-02T19:00:00-05:00</published>
     <updated>2017-09-02T16:50:47-04:00</updated>
     <author>
-      <name>Article Author</name>
+      <name>Stephen Bussey</name>
     </author>
     <content type="html">&lt;p&gt;&lt;em&gt;Exceptional has been added as a core value at SalesLoft; I have been thinking about what it means and how it can be achieved. I thoroughly believe that anyone can be exceptional through deliberate action and self reflection.&lt;/em&gt;&lt;/p&gt;
 
@@ -129,12 +128,12 @@ cropped_image = Magick::Image.read(image)[0].crop(
   </entry>
   <entry>
     <title>Identifying and Fixing Web Application Performance Problems</title>
-    <link rel="alternate" href="http://blog.url.com/2015/11/10/performance-fixes.html"/>
-    <id>http://blog.url.com/2015/11/10/performance-fixes.html</id>
+    <link rel="alternate" href="https://stephenbussey.com/2015/11/10/performance-fixes.html"/>
+    <id>https://stephenbussey.com/2015/11/10/performance-fixes.html</id>
     <published>2015-11-09T19:00:00-05:00</published>
     <updated>2017-09-02T16:50:22-04:00</updated>
     <author>
-      <name>Article Author</name>
+      <name>Stephen Bussey</name>
     </author>
     <content type="html">&lt;p&gt;Identifying performance problems; it is a daunting task given to many software engineers who are working on scaling up applications. As requests increase in frequency from hundreds, thousands, tens of thousands per minute, being able to locate performance bottle necks and then fix them in crucial for long-term success. While not every application will scale in the same way, I&amp;rsquo;ve thought about tips that will hopefully help many engineers facing the same problems that I am facing.&lt;/p&gt;
 
@@ -194,12 +193,12 @@ Total runtime: 0.065 ms
   </entry>
   <entry>
     <title>Keeping Front End / Back End Test Parity</title>
-    <link rel="alternate" href="http://blog.url.com/2015/07/26/front-back-test-parity.html"/>
-    <id>http://blog.url.com/2015/07/26/front-back-test-parity.html</id>
+    <link rel="alternate" href="https://stephenbussey.com/2015/07/26/front-back-test-parity.html"/>
+    <id>https://stephenbussey.com/2015/07/26/front-back-test-parity.html</id>
     <published>2015-07-25T20:00:00-04:00</published>
     <updated>2017-09-02T16:50:08-04:00</updated>
     <author>
-      <name>Article Author</name>
+      <name>Stephen Bussey</name>
     </author>
     <content type="html">&lt;p&gt;One of the best aspects of being a Rails developer is the attitude of testing from the community (always test, duh!). Having an extensive test suite allows one to keep a Rails app relatively low on bugs, and ensures the best experience for engineers and users. It is also easy to translate this attitude of testing to a front end framework like React or AngularJS, the target of this blog post. One thing that is not easy, however, is ensuring proper integration between a front end and back end while trying to avoid costly integration tests. I would like to propose a novel way of approaching this integration point that I haven&amp;rsquo;t seen before: back end test generated fixtures for the front end HTTP integration points.&lt;/p&gt;
 
@@ -245,12 +244,12 @@ end
   </entry>
   <entry>
     <title>Learning New Languages, Frameworks, Tools</title>
-    <link rel="alternate" href="http://blog.url.com/2015/05/13/learning-things.html"/>
-    <id>http://blog.url.com/2015/05/13/learning-things.html</id>
+    <link rel="alternate" href="https://stephenbussey.com/2015/05/13/learning-things.html"/>
+    <id>https://stephenbussey.com/2015/05/13/learning-things.html</id>
     <published>2015-05-12T20:00:00-04:00</published>
     <updated>2017-09-02T16:49:49-04:00</updated>
     <author>
-      <name>Article Author</name>
+      <name>Stephen Bussey</name>
     </author>
     <content type="html">&lt;p&gt;A question that has been appearing more and more in my life as I have moved into a leadership position is &amp;ldquo;what is the best way for me to learn X?&amp;rdquo; It is a fairly innocuous question, but most people don&amp;rsquo;t seem to have an answer that works for them. I am going to share my thoughts on it, as I have been served pretty well by this process on new projects and jobs.&lt;/p&gt;
 
@@ -283,12 +282,12 @@ This is one engineers most often skip over. Talk about what you&amp;rsquo;re wor
   </entry>
   <entry>
     <title>The Weight of the Wizard</title>
-    <link rel="alternate" href="http://blog.url.com/2014/12/04/weight-wizard.html"/>
-    <id>http://blog.url.com/2014/12/04/weight-wizard.html</id>
+    <link rel="alternate" href="https://stephenbussey.com/2014/12/04/weight-wizard.html"/>
+    <id>https://stephenbussey.com/2014/12/04/weight-wizard.html</id>
     <published>2014-12-03T19:00:00-05:00</published>
     <updated>2017-09-02T16:49:20-04:00</updated>
     <author>
-      <name>Article Author</name>
+      <name>Stephen Bussey</name>
     </author>
     <content type="html">&lt;p&gt;Startups fly around at a million miles per hour. Just take a look on Hacker News, or Tech Crunch, or any of the countless other news outlets revolving around tech. When I look at the hubs, I see stories about scrappy developers who are working on the next big idea and hoping to make it big. These articles hit on a great part of being a software engineer right now, we can build anything that we put our minds to. However, how did these engineers come about finding and executing ideas? A software engineer will have many ideas bounced off them in their career, and many of these ideas will be humble requests from normal non-engineers. The real wizard must know how to look past the dollar bills or the latest Hacker News trends to find the ideas that might not be glamorous, but will make an impact.&lt;/p&gt;
 
