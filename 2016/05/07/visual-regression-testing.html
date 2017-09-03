@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Visual Regression Testing in Capybara</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-158b7d62.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>Visual Regression Testing in Capybara</h1>
+      <p>An interesting topic that is picking up traction with many front-end UI engineers is visual regression testing. Visual regression testing relies on known visual state, which enforces that the application has not visually changed between code changes. Our QA and UI engineering team at SalesLoft recently began to discuss their desire to try this out; I want to share our first iteration.</p>
+
+<h2>Visual Regression Test Requirements</h2>
+
+<p>I&rsquo;ve put together a conservative list of requirements for visual testing that came to my mind:</p>
+
+<ul>
+<li>Visual state is accessible to everyone with code access</li>
+<li>Visual state history is tracked and managed</li>
+<li>Any engineer can update the known visual state, documenting the previous and new state</li>
+<li>Changes in an unrelated part of the screen won&rsquo;t fail tests</li>
+<li>Changes in the related part of the screen will fail tests</li>
+<li>Failures should record with a visual diff indicating what failed</li>
+</ul>
+
+<p>Many of these requirements are satisfied by some form of VCS, git for us at SalesLoft. The rest must be implemented in code.</p>
+
+<h2>Capybara</h2>
+
+<p>Capybara is the perfect tool for QA teams. Tests can be written against the entire stack and re-run in a predictable manner. There is a bit of leg-work here, and the speed of them makes Capybara undesirable for normal CI processes. However, having Capybara setup makes the screenshot diff process near trivial, due to the <code>page.save_screenshot</code> method that Capybara exposes.</p>
+
+<p>Setting up Capybara is beyond the scope of this post, so I&rsquo;ll assume that you are at the point where <code>page.save_screenshot</code> works for you, and your tests are runnable.</p>
+
+<h2>Screenshot Process</h2>
+
+<p>Taking a screenshot with <code>page.save_screenshot</code> works well, but misses the requirement of unrelated screen changes failing tests. The current way that I get around this is by cropping the screenshot to the dimensions of a unique selector on the page.</p>
+
+<pre><code class="ruby">image = page.save_screenshot(image_path)
+cropped_image = Magick::Image.read(image)[0].crop(
+  location.x - padding/2,
+  location.y - padding/2,
+  size.width + padding,
+  size.height + padding
+)
+</code></pre>
+
+<p>The padding allows for a little bit of context on the page (where is this element?), but could be removed to have the exact dimensions of the element.</p>
+
+<h2>ImageMagick (RMagick)</h2>
+
+<p>ImageMagick provides a great image comparison algorithm which will provide the number of pixels changed and an image containing all changed components in bright red. It&rsquo;s also perceptively fast for what it is doing.</p>
+
+<pre><code class="ruby">diff_image, pixels_changed = existing_image.
+  compare_channel(image, Magick::AbsoluteErrorMetric)
+</code></pre>
+
+<h2>Putting it Together</h2>
+
+<p>Putting together screenshot and diff capabilities gives everything needed to write visual regression tests. The interface that I&rsquo;ve been working for now looks like this:</p>
+
+<pre><code class="ruby">ensure_pixel_perfection.
+  of(&quot;some visual element&quot;).
+  using(&quot;#my-unique-selector&quot;).
+  retina.
+  call
+</code></pre>
+
+<p>This will provide a file called fixtures/some-visual-element.png which gets created when the file doesn&rsquo;t exist, and diff&rsquo;d when it does exist. We commit this file to git and then update it when things change.</p>
+
+<p><img src="https://cdn-images-1.medium.com/max/2000/1*WrEbDSd5kJpgljHrJ9x-7g.png" class="alignnone" />
+<em>A visual diff from SalesLoft Cadence where “Edit a Template” has been changed to “Create a Template”</em></p>
+
+<h2>The Code</h2>
+
+<p>I can&rsquo;t promise support for your codebase, so I have chosen to not gemify this code. I&rsquo;ve put it up as a <a href="https://gist.github.com/sb8244/55246c51e469524f2abd0c17dd3c574e">gist</a> instead. Note that this requires Rails, Capybara, and RMagick gems. You could adapt it to not be Rails dependent, if you are on something else.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/testing.html">testing</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <!--
+    <aside>
+      <h2>Recent Articles</h2>
+      <ol>
+          <li><a href="/2016/05/07/visual-regression-testing.html">Visual Regression Testing in Capybara</a> <span>May  7</span></li>
+          <li><a href="/2015/12/03/exceptional-starts-with-a-choice.html">Exceptional Starts with a Choice</a> <span>Dec  3</span></li>
+          <li><a href="/2015/11/10/performance-fixes.html">Identifying and Fixing Web Application Performance Problems</a> <span>Nov 10</span></li>
+          <li><a href="/2015/07/26/front-back-test-parity.html">Keeping Front End / Back End Test Parity</a> <span>Jul 26</span></li>
+          <li><a href="/2015/05/13/learning-things.html">Learning New Languages, Frameworks, Tools</a> <span>May 13</span></li>
+          <li><a href="/2014/12/04/weight-wizard.html">The Weight of the Wizard</a> <span>Dec  4</span></li>
+      </ol>
+
+      <h2>Tags</h2>
+      <ol>
+          <li><a href="/tags/testing.html">testing (2)</a></li>
+          <li><a href="/tags/values.html">values (3)</a></li>
+          <li><a href="/tags/performance.html">performance (1)</a></li>
+      </ol>
+
+      <h2>By Year</h2>
+      <ol>
+          <li><a href="/2016.html">2016 (1)</a></li>
+          <li><a href="/2015.html">2015 (4)</a></li>
+          <li><a href="/2014.html">2014 (1)</a></li>
+      </ol>
+    </aside>
+    -->
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

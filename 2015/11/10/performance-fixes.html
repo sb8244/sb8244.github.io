@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Identifying and Fixing Web Application Performance Problems</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-158b7d62.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>Identifying and Fixing Web Application Performance Problems</h1>
+      <p>Identifying performance problems; it is a daunting task given to many software engineers who are working on scaling up applications. As requests increase in frequency from hundreds, thousands, tens of thousands per minute, being able to locate performance bottle necks and then fix them in crucial for long-term success. While not every application will scale in the same way, I&rsquo;ve thought about tips that will hopefully help many engineers facing the same problems that I am facing.</p>
+
+<h2>Locating the Areas to Improve</h2>
+
+<p>An application has hundreds of endpoints and a ton of code, how can one possibly know where to start looking for performance gains? Through tools like New Relic, I can identify low performers to the Apdex and average request time.</p>
+
+<p>My favorite view in New Relic is the &ldquo;Apdex most dissatisfying&rdquo; view under transactions. Through this view, I am able to see requests which most disatisfy the user base. However, I  focus on transactions with moderate to high throughput to see the most gain. We&rsquo;ve recently lowered our t-threshold from 0.50 (default) to 0.04 (aggressive). By doing this, we have set a high performance bar that allows for better feedback through the apdex.</p>
+
+<p>Another great view is the simple &ldquo;databases&rdquo; tab. By knowing the load on the database, and equating that to usage, I can understand which transactions are heavy hitters, and how their throughput affects the database. Also, if memcache or redis usage is ballooning, it is an indicator that there may be caching in an incorrect place.</p>
+
+<p>After identifying transactions that are candidates for improvement, I follow a few sets of rules, and then explore fringe cases that don&rsquo;t fall into them on a case-by-case basis.</p>
+
+<h2>Assume it is the Database</h2>
+
+<p>Databases do a ton of work, and there is a good chance that applications are using them in a way that reduces their maximum throughput. Although there are many types of database issues, two that are most seen by me are <strong>n+1 queries</strong> and <strong>missing indices</strong>.</p>
+
+<p><strong>n+1 queries</strong> are pesky occurences where an application is requesting information from the database in an iteration that could have been loaded by the database in a single query outside of the iteration. This topic has been hit pretty heavily, but one new contribution I can add is that a query doesn&rsquo;t have to hit the database to be a performance deficit. In Rails, the active record cache can save a database call at the expense of fully loading Arel objects. I use Rails panel to identify &ldquo;cached queries&rdquo; and try to remove them in as many cases as possible. I&rsquo;ve seen performance gains as drastic as 10+ seconds just from cached queries that don&rsquo;t even hit the database.</p>
+
+<p><strong>Missing indices</strong> is a very common database issue that is exactly as it sounds. Outside of the usual index suspects, Postgres offers partial index which can be a huge performance gain in certain situations. Take for instance this edited filtered scan explanation:</p>
+
+<pre><code>Limit  (cost=0.00..88.80 rows=1 width=493) (actual time=0.387..0.387 rows=0 loops=1)
+Index Scan using index_name on my_table  (cost=0.56..12.60 rows=1 width=430) (actual time=0.106..0.106 rows=1 loops=1)
+         Index Cond: (some_text_field = &#39;some value&#39;::text)
+         Filter: (team_id = 1 AND NOT deleted)
+        Rows Removed by Filter: 1720
+Total runtime: 0.406 ms
+</code></pre>
+
+<p>It is good that this is hitting an index, but do you notice the filter conditional on a constant value? By taking advantage of a partial index <code>WHERE NOT deleted</code>, huge performance gains can be realized:</p>
+
+<pre><code>Limit  (cost=0.28..8.30 rows=1 width=493) (actual time=0.038..0.038 rows=0 loops=1)
+  -&gt;  Index Scan using index_name on my_table  (cost=0.28..8.30 rows=1 width=493) (actual time=0.038..0.038 rows=0 loops=1)
+        Index Cond: (some_text_field = &#39;some value&#39;::text)
+        Filter: (team_id = 1)
+Total runtime: 0.065 ms
+</code></pre>
+
+<p>There are tons of small tricks like this that are picked up through interacting with <code>EXPLAIN ANALYZE</code>. I encourage people looking to learn to dig into troublesome queries and really taking the time to understand the debug output. I&rsquo;ve found some queries that can go from 15s down to .01ms just from partial indices.</p>
+
+<h2>Look for Sequences of Code to Memoize</h2>
+
+<p>Memoization is a hot topic in the Ruby world. I personally reach for <code>@method_name ||= the content</code> and stick to one line methods whenever possible. However, it is possible to cache <code>begin ; end</code> and <code>if</code> statements in Ruby.</p>
+
+<p>When a request is being executed, most memory is going to be specific for that request. A decision can be made of &ldquo;if this count is 1 at the beginning of the request and 2 at the end, does that matter?&rdquo;. If the answer is no (it usually is), then one can memoize the count method to store the result in memory. This is how n+1 queries can be removed.</p>
+
+<h2>Discover the Context of Code</h2>
+
+<p>A continuation of memoization is truly understanding the context that code will be executing in. In order to make decisions like memoization, one must be cognizant of the usage of that code elsewhere in the codebase. For instance, will the method be used in the foreground, background, once a second, 100 times per second, etc. Code has to work and be performant in all contexts, and the only way to do this is fully understand it. It is the job of a software engineer to discover this context.</p>
+
+<p>One example of how drastic context can be is a class which caches a value in memcache (off box). If the code is executing in a background job 1 at a time, then the cache is necessary to prevent recalculation between runs. However, if the code is executing inside of an iteration of a single run, then cache could be avoided in exchange for memory. Finding instances where application code can be moved from off-box to in-memory will speed it up significantly.</p>
+
+<h2>Conclusion</h2>
+
+<p>I don&rsquo;t usually end my posts with conclusions, but it is important to re-iterate that performance optimization is an open book where one solution won&rsquo;t be the end all. I&rsquo;ve learned something new almost every time I&rsquo;ve went in for speed improvements, and I come out happy every single time. Give it a shot and let me know if you find any cool techniques!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/performance.html">performance</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <!--
+    <aside>
+      <h2>Recent Articles</h2>
+      <ol>
+          <li><a href="/2016/05/07/visual-regression-testing.html">Visual Regression Testing in Capybara</a> <span>May  7</span></li>
+          <li><a href="/2015/12/03/exceptional-starts-with-a-choice.html">Exceptional Starts with a Choice</a> <span>Dec  3</span></li>
+          <li><a href="/2015/11/10/performance-fixes.html">Identifying and Fixing Web Application Performance Problems</a> <span>Nov 10</span></li>
+          <li><a href="/2015/07/26/front-back-test-parity.html">Keeping Front End / Back End Test Parity</a> <span>Jul 26</span></li>
+          <li><a href="/2015/05/13/learning-things.html">Learning New Languages, Frameworks, Tools</a> <span>May 13</span></li>
+          <li><a href="/2014/12/04/weight-wizard.html">The Weight of the Wizard</a> <span>Dec  4</span></li>
+      </ol>
+
+      <h2>Tags</h2>
+      <ol>
+          <li><a href="/tags/testing.html">testing (2)</a></li>
+          <li><a href="/tags/values.html">values (3)</a></li>
+          <li><a href="/tags/performance.html">performance (1)</a></li>
+      </ol>
+
+      <h2>By Year</h2>
+      <ol>
+          <li><a href="/2016.html">2016 (1)</a></li>
+          <li><a href="/2015.html">2015 (4)</a></li>
+          <li><a href="/2014.html">2014 (1)</a></li>
+      </ol>
+    </aside>
+    -->
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

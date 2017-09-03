@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Blog Name</title>
+  <subtitle>Blog subtitle</subtitle>
+  <id>http://blog.url.com/</id>
+  <link href="http://blog.url.com/"/>
+  <link href="http://blog.url.com/feed.xml" rel="self"/>
+  <updated>2016-05-06T20:00:00-04:00</updated>
+  <author>
+    <name>Blog Author</name>
+  </author>
+  <entry>
+    <title>Visual Regression Testing in Capybara</title>
+    <link rel="alternate" href="http://blog.url.com/2016/05/07/visual-regression-testing.html"/>
+    <id>http://blog.url.com/2016/05/07/visual-regression-testing.html</id>
+    <published>2016-05-06T20:00:00-04:00</published>
+    <updated>2017-09-02T17:16:04-04:00</updated>
+    <author>
+      <name>Article Author</name>
+    </author>
+    <content type="html">&lt;p&gt;An interesting topic that is picking up traction with many front-end UI engineers is visual regression testing. Visual regression testing relies on known visual state, which enforces that the application has not visually changed between code changes. Our QA and UI engineering team at SalesLoft recently began to discuss their desire to try this out; I want to share our first iteration.&lt;/p&gt;
+
+&lt;h2&gt;Visual Regression Test Requirements&lt;/h2&gt;
+
+&lt;p&gt;I&amp;rsquo;ve put together a conservative list of requirements for visual testing that came to my mind:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Visual state is accessible to everyone with code access&lt;/li&gt;
+&lt;li&gt;Visual state history is tracked and managed&lt;/li&gt;
+&lt;li&gt;Any engineer can update the known visual state, documenting the previous and new state&lt;/li&gt;
+&lt;li&gt;Changes in an unrelated part of the screen won&amp;rsquo;t fail tests&lt;/li&gt;
+&lt;li&gt;Changes in the related part of the screen will fail tests&lt;/li&gt;
+&lt;li&gt;Failures should record with a visual diff indicating what failed&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Many of these requirements are satisfied by some form of VCS, git for us at SalesLoft. The rest must be implemented in code.&lt;/p&gt;
+
+&lt;h2&gt;Capybara&lt;/h2&gt;
+
+&lt;p&gt;Capybara is the perfect tool for QA teams. Tests can be written against the entire stack and re-run in a predictable manner. There is a bit of leg-work here, and the speed of them makes Capybara undesirable for normal CI processes. However, having Capybara setup makes the screenshot diff process near trivial, due to the &lt;code&gt;page.save_screenshot&lt;/code&gt; method that Capybara exposes.&lt;/p&gt;
+
+&lt;p&gt;Setting up Capybara is beyond the scope of this post, so I&amp;rsquo;ll assume that you are at the point where &lt;code&gt;page.save_screenshot&lt;/code&gt; works for you, and your tests are runnable.&lt;/p&gt;
+
+&lt;h2&gt;Screenshot Process&lt;/h2&gt;
+
+&lt;p&gt;Taking a screenshot with &lt;code&gt;page.save_screenshot&lt;/code&gt; works well, but misses the requirement of unrelated screen changes failing tests. The current way that I get around this is by cropping the screenshot to the dimensions of a unique selector on the page.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="ruby"&gt;image = page.save_screenshot(image_path)
+cropped_image = Magick::Image.read(image)[0].crop(
+  location.x - padding/2,
+  location.y - padding/2,
+  size.width + padding,
+  size.height + padding
+)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The padding allows for a little bit of context on the page (where is this element?), but could be removed to have the exact dimensions of the element.&lt;/p&gt;
+
+&lt;h2&gt;ImageMagick (RMagick)&lt;/h2&gt;
+
+&lt;p&gt;ImageMagick provides a great image comparison algorithm which will provide the number of pixels changed and an image containing all changed components in bright red. It&amp;rsquo;s also perceptively fast for what it is doing.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="ruby"&gt;diff_image, pixels_changed = existing_image.
+  compare_channel(image, Magick::AbsoluteErrorMetric)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Putting it Together&lt;/h2&gt;
+
+&lt;p&gt;Putting together screenshot and diff capabilities gives everything needed to write visual regression tests. The interface that I&amp;rsquo;ve been working for now looks like this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="ruby"&gt;ensure_pixel_perfection.
+  of(&amp;quot;some visual element&amp;quot;).
+  using(&amp;quot;#my-unique-selector&amp;quot;).
+  retina.
+  call
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This will provide a file called fixtures/some-visual-element.png which gets created when the file doesn&amp;rsquo;t exist, and diff&amp;rsquo;d when it does exist. We commit this file to git and then update it when things change.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src="https://cdn-images-1.medium.com/max/2000/1*WrEbDSd5kJpgljHrJ9x-7g.png" class="alignnone" /&gt;
+&lt;em&gt;A visual diff from SalesLoft Cadence where “Edit a Template” has been changed to “Create a Template”&lt;/em&gt;&lt;/p&gt;
+
+&lt;h2&gt;The Code&lt;/h2&gt;
+
+&lt;p&gt;I can&amp;rsquo;t promise support for your codebase, so I have chosen to not gemify this code. I&amp;rsquo;ve put it up as a &lt;a href="https://gist.github.com/sb8244/55246c51e469524f2abd0c17dd3c574e"&gt;gist&lt;/a&gt; instead. Note that this requires Rails, Capybara, and RMagick gems. You could adapt it to not be Rails dependent, if you are on something else.&lt;/p&gt;
+</content>
+  </entry>
+  <entry>
+    <title>Exceptional Starts with a Choice</title>
+    <link rel="alternate" href="http://blog.url.com/2015/12/03/exceptional-starts-with-a-choice.html"/>
+    <id>http://blog.url.com/2015/12/03/exceptional-starts-with-a-choice.html</id>
+    <published>2015-12-02T19:00:00-05:00</published>
+    <updated>2017-09-02T16:50:47-04:00</updated>
+    <author>
+      <name>Article Author</name>
+    </author>
+    <content type="html">&lt;p&gt;&lt;em&gt;Exceptional has been added as a core value at SalesLoft; I have been thinking about what it means and how it can be achieved. I thoroughly believe that anyone can be exceptional through deliberate action and self reflection.&lt;/em&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Exceptionalism is not good, okay, or average.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;It&amp;rsquo;s easy to get sucked into the allure of skimming by as average. Exceptional people strive for more than this; they seek to be at the top of their craft.&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Exceptionalism is not a gift, talent or easy. It is a choice, an attitude, and possible to achieve.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Anyone can be exceptional by making the choice to go above and beyond in whatever they do. As such, exceptionalism involves two components, knowledge of the task, and mindset. Take for example a star athlete: an athlete possesses a natural affinity, but became a star through the mindset to practice and garner intimate knowledge of their game.&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Exceptionalism isn&amp;rsquo;t permanent, it must be maintained by paying attention to actions and goals.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;It&amp;rsquo;s possible to make the choice to not be exceptional. Even the most exceptional people can lose sight of their drive and must be vigilant to keep focus by continuing to practice and learn.&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Exceptional is relative.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Exceptional requires a baseline, average. On this note, not everyone can be labeled exceptional. What does this mean in the workplace where one strives to be around only exceptional people? While everyone at the job might be exceptional relative to the industry or population, they can&amp;rsquo;t all be exceptional to each other. &lt;em&gt;I don&amp;rsquo;t think that this is a bad thing, as I see it as a chance to learn and grow.&lt;/em&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Exceptional starts with a choice.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;&lt;em&gt;I&amp;rsquo;ve already said this, but it&amp;rsquo;s worth a final note.&lt;/em&gt; Being exceptional is a choice that can be made. It isn&amp;rsquo;t instant and requires hard work and motivation, but it is possible. Starting each day with the &lt;a href="https://en.wikipedia.org/wiki/Intentional_living"&gt;intention&lt;/a&gt; to be exceptional will eventually pay off.&lt;/p&gt;
+</content>
+  </entry>
+  <entry>
+    <title>Identifying and Fixing Web Application Performance Problems</title>
+    <link rel="alternate" href="http://blog.url.com/2015/11/10/performance-fixes.html"/>
+    <id>http://blog.url.com/2015/11/10/performance-fixes.html</id>
+    <published>2015-11-09T19:00:00-05:00</published>
+    <updated>2017-09-02T16:50:22-04:00</updated>
+    <author>
+      <name>Article Author</name>
+    </author>
+    <content type="html">&lt;p&gt;Identifying performance problems; it is a daunting task given to many software engineers who are working on scaling up applications. As requests increase in frequency from hundreds, thousands, tens of thousands per minute, being able to locate performance bottle necks and then fix them in crucial for long-term success. While not every application will scale in the same way, I&amp;rsquo;ve thought about tips that will hopefully help many engineers facing the same problems that I am facing.&lt;/p&gt;
+
+&lt;h2&gt;Locating the Areas to Improve&lt;/h2&gt;
+
+&lt;p&gt;An application has hundreds of endpoints and a ton of code, how can one possibly know where to start looking for performance gains? Through tools like New Relic, I can identify low performers to the Apdex and average request time.&lt;/p&gt;
+
+&lt;p&gt;My favorite view in New Relic is the &amp;ldquo;Apdex most dissatisfying&amp;rdquo; view under transactions. Through this view, I am able to see requests which most disatisfy the user base. However, I  focus on transactions with moderate to high throughput to see the most gain. We&amp;rsquo;ve recently lowered our t-threshold from 0.50 (default) to 0.04 (aggressive). By doing this, we have set a high performance bar that allows for better feedback through the apdex.&lt;/p&gt;
+
+&lt;p&gt;Another great view is the simple &amp;ldquo;databases&amp;rdquo; tab. By knowing the load on the database, and equating that to usage, I can understand which transactions are heavy hitters, and how their throughput affects the database. Also, if memcache or redis usage is ballooning, it is an indicator that there may be caching in an incorrect place.&lt;/p&gt;
+
+&lt;p&gt;After identifying transactions that are candidates for improvement, I follow a few sets of rules, and then explore fringe cases that don&amp;rsquo;t fall into them on a case-by-case basis.&lt;/p&gt;
+
+&lt;h2&gt;Assume it is the Database&lt;/h2&gt;
+
+&lt;p&gt;Databases do a ton of work, and there is a good chance that applications are using them in a way that reduces their maximum throughput. Although there are many types of database issues, two that are most seen by me are &lt;strong&gt;n+1 queries&lt;/strong&gt; and &lt;strong&gt;missing indices&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;n+1 queries&lt;/strong&gt; are pesky occurences where an application is requesting information from the database in an iteration that could have been loaded by the database in a single query outside of the iteration. This topic has been hit pretty heavily, but one new contribution I can add is that a query doesn&amp;rsquo;t have to hit the database to be a performance deficit. In Rails, the active record cache can save a database call at the expense of fully loading Arel objects. I use Rails panel to identify &amp;ldquo;cached queries&amp;rdquo; and try to remove them in as many cases as possible. I&amp;rsquo;ve seen performance gains as drastic as 10+ seconds just from cached queries that don&amp;rsquo;t even hit the database.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Missing indices&lt;/strong&gt; is a very common database issue that is exactly as it sounds. Outside of the usual index suspects, Postgres offers partial index which can be a huge performance gain in certain situations. Take for instance this edited filtered scan explanation:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Limit  (cost=0.00..88.80 rows=1 width=493) (actual time=0.387..0.387 rows=0 loops=1)
+Index Scan using index_name on my_table  (cost=0.56..12.60 rows=1 width=430) (actual time=0.106..0.106 rows=1 loops=1)
+         Index Cond: (some_text_field = &amp;#39;some value&amp;#39;::text)
+         Filter: (team_id = 1 AND NOT deleted)
+        Rows Removed by Filter: 1720
+Total runtime: 0.406 ms
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;It is good that this is hitting an index, but do you notice the filter conditional on a constant value? By taking advantage of a partial index &lt;code&gt;WHERE NOT deleted&lt;/code&gt;, huge performance gains can be realized:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Limit  (cost=0.28..8.30 rows=1 width=493) (actual time=0.038..0.038 rows=0 loops=1)
+  -&amp;gt;  Index Scan using index_name on my_table  (cost=0.28..8.30 rows=1 width=493) (actual time=0.038..0.038 rows=0 loops=1)
+        Index Cond: (some_text_field = &amp;#39;some value&amp;#39;::text)
+        Filter: (team_id = 1)
+Total runtime: 0.065 ms
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;There are tons of small tricks like this that are picked up through interacting with &lt;code&gt;EXPLAIN ANALYZE&lt;/code&gt;. I encourage people looking to learn to dig into troublesome queries and really taking the time to understand the debug output. I&amp;rsquo;ve found some queries that can go from 15s down to .01ms just from partial indices.&lt;/p&gt;
+
+&lt;h2&gt;Look for Sequences of Code to Memoize&lt;/h2&gt;
+
+&lt;p&gt;Memoization is a hot topic in the Ruby world. I personally reach for &lt;code&gt;@method_name ||= the content&lt;/code&gt; and stick to one line methods whenever possible. However, it is possible to cache &lt;code&gt;begin ; end&lt;/code&gt; and &lt;code&gt;if&lt;/code&gt; statements in Ruby.&lt;/p&gt;
+
+&lt;p&gt;When a request is being executed, most memory is going to be specific for that request. A decision can be made of &amp;ldquo;if this count is 1 at the beginning of the request and 2 at the end, does that matter?&amp;rdquo;. If the answer is no (it usually is), then one can memoize the count method to store the result in memory. This is how n+1 queries can be removed.&lt;/p&gt;
+
+&lt;h2&gt;Discover the Context of Code&lt;/h2&gt;
+
+&lt;p&gt;A continuation of memoization is truly understanding the context that code will be executing in. In order to make decisions like memoization, one must be cognizant of the usage of that code elsewhere in the codebase. For instance, will the method be used in the foreground, background, once a second, 100 times per second, etc. Code has to work and be performant in all contexts, and the only way to do this is fully understand it. It is the job of a software engineer to discover this context.&lt;/p&gt;
+
+&lt;p&gt;One example of how drastic context can be is a class which caches a value in memcache (off box). If the code is executing in a background job 1 at a time, then the cache is necessary to prevent recalculation between runs. However, if the code is executing inside of an iteration of a single run, then cache could be avoided in exchange for memory. Finding instances where application code can be moved from off-box to in-memory will speed it up significantly.&lt;/p&gt;
+
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+
+&lt;p&gt;I don&amp;rsquo;t usually end my posts with conclusions, but it is important to re-iterate that performance optimization is an open book where one solution won&amp;rsquo;t be the end all. I&amp;rsquo;ve learned something new almost every time I&amp;rsquo;ve went in for speed improvements, and I come out happy every single time. Give it a shot and let me know if you find any cool techniques!&lt;/p&gt;
+</content>
+  </entry>
+  <entry>
+    <title>Keeping Front End / Back End Test Parity</title>
+    <link rel="alternate" href="http://blog.url.com/2015/07/26/front-back-test-parity.html"/>
+    <id>http://blog.url.com/2015/07/26/front-back-test-parity.html</id>
+    <published>2015-07-25T20:00:00-04:00</published>
+    <updated>2017-09-02T16:50:08-04:00</updated>
+    <author>
+      <name>Article Author</name>
+    </author>
+    <content type="html">&lt;p&gt;One of the best aspects of being a Rails developer is the attitude of testing from the community (always test, duh!). Having an extensive test suite allows one to keep a Rails app relatively low on bugs, and ensures the best experience for engineers and users. It is also easy to translate this attitude of testing to a front end framework like React or AngularJS, the target of this blog post. One thing that is not easy, however, is ensuring proper integration between a front end and back end while trying to avoid costly integration tests. I would like to propose a novel way of approaching this integration point that I haven&amp;rsquo;t seen before: back end test generated fixtures for the front end HTTP integration points.&lt;/p&gt;
+
+&lt;h2&gt;The Problem&lt;/h2&gt;
+
+&lt;p&gt;Writing integration tests that test the entire application (consuming real HTTP end points and data) is tricky business. Keeping the entire codebase mounted and running in every environment can lead to slow test suites that sap away developer time between runs. There has to be an alternative to integration tests that are &amp;ldquo;just as good&amp;rdquo; and prevent bugs and regressions.&lt;/p&gt;
+
+&lt;p&gt;One alternative that seems obvious and supported by resources online is mocking HTTP interaction with fixture files. For instance, when the test suite requests &lt;code&gt;/users.json&lt;/code&gt;, return a pre-determined JSON blob that has the list of users. Ideally, this JSON reflects the current state of the back end API 100% of the time. What happens if this JSON no longer reflects the state of the back end? &lt;strong&gt;Bugs get introduced and users will be affected&lt;/strong&gt;. What happens when a developer wants to regenerate a fixture that was generated with data they don&amp;rsquo;t have? &lt;strong&gt;The developer will make concessions and introduce potential bugs.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;I was thinking about how to solve this problem, always ensuring that the back end and front end are in sync. The solution should have these properties:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Generate fixtures based on API end-points.&lt;/li&gt;
+&lt;li&gt;Be up to date 100% of the time, without developer thought.&lt;/li&gt;
+&lt;li&gt;Alert a back end developer when they are changing something that could affect the front end.&lt;/li&gt;
+&lt;li&gt;Reproducibility on all developer machines. If two developers run it independently, they get the same result.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2&gt;Solution&lt;/h2&gt;
+
+&lt;p&gt;My solution involves capturing the HTTP response from test cases, and writing these out to disk in files that can be consumed by a front end test suite. The test cases themselves generate the fixtures, so the developer only has to run the back end suite before the front end suite when they make a change to ensure everything is up to date. One great property about test suites is that they involve consistent data setup across all developer machines, although they may involve random data which must be accounted for.&lt;/p&gt;
+
+&lt;p&gt;In RSpec/Rails, a developer can write the following spec which will generate the proper fixture:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="ruby"&gt;describe &amp;quot;GET index&amp;quot; do
+  it &amp;quot;is successful&amp;quot;, fixture: &amp;quot;widgets/index.json&amp;quot; do
+    get :index
+    expect(response).to be_success
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The developer does not need to think about the fixture itself, only the particular test case they are looking to mock out. If the fixture changes between invocations, their test will fail and they will be aware that they might be introducing a bug. They can delete the file to regenerate it.&lt;/p&gt;
+
+&lt;p&gt;One caveat of this is that data can easily change between invocations of the test. For example, &lt;code&gt;*_id, created_at, updated_at&lt;/code&gt; are all fields that can change frequently. As a solution for this, I propose allowing for certain keys to be ignored (and implemented it out of the box in rspec-rcv gem).&lt;/p&gt;
+
+&lt;h2&gt;Gem&lt;/h2&gt;
+
+&lt;p&gt;I&amp;rsquo;ve put this together into a gem called rspec-rcv (reverse of VCR). If you have seen this testing paradigm before, let me know! I couldn&amp;rsquo;t find anything in my research and from discussing with experienced software engineers. Who knows, maybe it will help inspire a better name?&lt;/p&gt;
+
+&lt;p&gt;The gem is at &lt;a href="https://github.com/SalesLoft/rspec-rcv"&gt;https://github.com/SalesLoft/rspec-rcv&lt;/a&gt; and is available from download on &lt;a href="https://rubygems.org/gems/rspec-rcv"&gt;rubygems.org&lt;/a&gt;.&lt;/p&gt;
+</content>
+  </entry>
+  <entry>
+    <title>Learning New Languages, Frameworks, Tools</title>
+    <link rel="alternate" href="http://blog.url.com/2015/05/13/learning-things.html"/>
+    <id>http://blog.url.com/2015/05/13/learning-things.html</id>
+    <published>2015-05-12T20:00:00-04:00</published>
+    <updated>2017-09-02T16:49:49-04:00</updated>
+    <author>
+      <name>Article Author</name>
+    </author>
+    <content type="html">&lt;p&gt;A question that has been appearing more and more in my life as I have moved into a leadership position is &amp;ldquo;what is the best way for me to learn X?&amp;rdquo; It is a fairly innocuous question, but most people don&amp;rsquo;t seem to have an answer that works for them. I am going to share my thoughts on it, as I have been served pretty well by this process on new projects and jobs.&lt;/p&gt;
+
+&lt;p&gt;There are a few components to my formula which I try to follow pretty closely when I pick up a new framework. I will use the example of my recent &amp;ldquo;Dog Barking Detection&amp;rdquo; iOS app. It stretched my limits from web engineer to focusing more on the mobile device, which was new and exciting. I also had a lot of success in the project without formal iOS experience. Let&amp;rsquo;s get to it.
+&lt;h2 id="locate-material-about-the-topic-but-not-too-much"&gt;Locate material about the topic, but not too much&lt;/h2&gt;
+My tactic for dealing with the plethora of material that is available on the web is to use whatever material I find as a&lt;em&gt;reference&lt;/em&gt; and not as the end-all for that topic. For instance, a lot of people in the Rails community talk about Hartl&amp;rsquo;s tutorial. I&amp;rsquo;ve witnessed many Rails developers building up a dependency on this tutorial where they are unable to get past the content. By building only the app that Hartl talks about, the individual loses the ability to look critically at the larger picture. I am not sure what a phrase for this is, but let&amp;rsquo;s call it tutorial paralysis.&lt;/p&gt;
+
+&lt;p&gt;For me, I didn&amp;rsquo;t find any full on tutorials that were of value, but piece-mealed my application together organically by focusing on 1 component at a time.
+&lt;h2 id="find-an-idea-you-genuinely-care-about"&gt;Find an idea you genuinely care about&lt;/h2&gt;
+The &lt;em&gt;only&lt;/em&gt; way to get truly involved in a project is to care about the project. This is a simple concept that is overlooked because of the tutorial paralysis that builds up initially. For me, I faced a problem with my dog&amp;rsquo;s separation anxiety and wanted to build an app to let me track / listen to barking instances, so I can know if he&amp;rsquo;s healthy while I&amp;rsquo;m away. By being genuinly committed to the success of this project, I know that it has a higher chance of getting done.&lt;/p&gt;
+
+&lt;p&gt;Ideas don&amp;rsquo;t need to be real world or even useful to anyone but you. Just pick something &lt;em&gt;you&lt;/em&gt; are interested in and have at it. Another benefit of this is that when you are asked to explain something about the project in an interview, you will have a much much deeper understanding of the topic. This will come off as &amp;ldquo;on-point&amp;rdquo; versus talking about someone else&amp;rsquo;s project that you are only mildly interested in.
+&lt;h2 id="start-with-hello-world-and-go-from-there"&gt;Start with &amp;ldquo;Hello World!&amp;rdquo; and go from there&lt;/h2&gt;
+I always start any app in a new framework with &amp;ldquo;Hello world!&amp;rdquo; This seems silly, doesn&amp;rsquo;t it? However, this ensures that I can take a managable first step in making sure the toolchain that I will use is setup.&lt;/p&gt;
+
+&lt;p&gt;The difference is that my &amp;ldquo;Hello World&amp;rdquo; project quickly turns into the product that I care about. There needs to be quick agility in turning that working setup into the project I want to work on. This is one of the more interesting ways of how I start off a new project in a new language or framework.&lt;/p&gt;
+
+&lt;p&gt;&amp;ldquo;Going from there&amp;rdquo; is a pretty large statement in and of itself. The classical approach to this, and one that I believe in greatly, is problem decomposition. My strongest attribute as an engineer, by far, is my ability to rip a problem apart to its core, build that up, and then put it together. In my iOS app, I would focus on what I wanted the app to do next (as a user myself) and then make it happen. I had to overcome difficult technical challenges like dealing with audio along the way, but it was manageable because I broke the problem down and focused on that small bit at a time.
+&lt;h2 id="prioritize-that-project-over-all-other-projects-in-your-free-time"&gt;Prioritize that project over all other projects in your free time&lt;/h2&gt;
+There&amp;rsquo;s no secret here, learning takes time; time that you may not have. If you want to become truly skilled in a certain area, you need to be willing to invest time. That often means later nights with no return other than having something working. &lt;strong&gt;Failure will occur frequently&lt;/strong&gt; but will make way for wins and overall success. You aren&amp;rsquo;t going to get paid in $, but you will gain knowledge that carriers with you for a while.&lt;/p&gt;
+
+&lt;p&gt;I suggest getting into a rhythm where you are holding yourself accountable for making sure your project gets done. If you &amp;ldquo;check-in&amp;rdquo; with yourself on a weekly basis, and stay true to yourself, you will probably make progress. Remember that this isn&amp;rsquo;t forever, putting in some time now to benefit your future self is totally worth it and, again, isn&amp;rsquo;t forever.
+&lt;h2 id="talk-about-the-project"&gt;Talk about the project&lt;/h2&gt;
+This is one engineers most often skip over. Talk about what you&amp;rsquo;re working on. Get your co-workers and friends excited about it. Let them know how cool you are for tackling a new problem. Hell, open source it and share the source code with them if you&amp;rsquo;re willing / able (you &lt;em&gt;probably&lt;/em&gt; won&amp;rsquo;t make money on it so at least consider it).&lt;/p&gt;
+
+&lt;p&gt;By sharing what you&amp;rsquo;re working on (probably to people who know what you&amp;rsquo;re talking about), you will let people know that you care about bettering your skillset. You will appear as more self-starting, determined, and you will hopefully gain confidence in the new skillset.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;What have I missed? How do you acclimate to a new language or framework?&lt;/strong&gt;&lt;/p&gt;
+</content>
+  </entry>
+  <entry>
+    <title>The Weight of the Wizard</title>
+    <link rel="alternate" href="http://blog.url.com/2014/12/04/weight-wizard.html"/>
+    <id>http://blog.url.com/2014/12/04/weight-wizard.html</id>
+    <published>2014-12-03T19:00:00-05:00</published>
+    <updated>2017-09-02T16:49:20-04:00</updated>
+    <author>
+      <name>Article Author</name>
+    </author>
+    <content type="html">&lt;p&gt;Startups fly around at a million miles per hour. Just take a look on Hacker News, or Tech Crunch, or any of the countless other news outlets revolving around tech. When I look at the hubs, I see stories about scrappy developers who are working on the next big idea and hoping to make it big. These articles hit on a great part of being a software engineer right now, we can build anything that we put our minds to. However, how did these engineers come about finding and executing ideas? A software engineer will have many ideas bounced off them in their career, and many of these ideas will be humble requests from normal non-engineers. The real wizard must know how to look past the dollar bills or the latest Hacker News trends to find the ideas that might not be glamorous, but will make an impact.&lt;/p&gt;
+
+&lt;p&gt;Software engineers out there can most likely relate to the countless times that individuals in their business organization, school, or family pitched an idea for a product or tool. Analyzing the impact of the product is the first step to knowing if it is worth the time. A product could potentially have significant impact on the daily life of a few individuals or be a generic consumer idea that doesn&amp;rsquo;t directly benefit anyone in particular. An engineer drawn to trends online might look at the first option as not having much direct benefit to them. It certainly won&amp;rsquo;t generate revenue if only a few people benefit and it might even be a time-sink in the end. However, the gratitude and favor that the development will bring to those people may potentially be worth intangibly more over time. Looking past the latest trends and analyzing the direct benefit is a good start to determining if a project is worth your time.&lt;/p&gt;
+
+&lt;p&gt;So how do the best engineers that I know choose a project? They look for areas that are going to make an impact. However, they don&amp;rsquo;t get caught up in whether the impact will be 10 people or 10,000.&lt;/p&gt;
+
+&lt;p&gt;What do you think? How do you pick projects and balance all of the project ideas that people throw at you?&lt;/p&gt;
+</content>
+  </entry>
+</feed>

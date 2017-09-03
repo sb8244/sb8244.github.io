@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Keeping Front End / Back End Test Parity</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-158b7d62.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>Keeping Front End / Back End Test Parity</h1>
+      <p>One of the best aspects of being a Rails developer is the attitude of testing from the community (always test, duh!). Having an extensive test suite allows one to keep a Rails app relatively low on bugs, and ensures the best experience for engineers and users. It is also easy to translate this attitude of testing to a front end framework like React or AngularJS, the target of this blog post. One thing that is not easy, however, is ensuring proper integration between a front end and back end while trying to avoid costly integration tests. I would like to propose a novel way of approaching this integration point that I haven&rsquo;t seen before: back end test generated fixtures for the front end HTTP integration points.</p>
+
+<h2>The Problem</h2>
+
+<p>Writing integration tests that test the entire application (consuming real HTTP end points and data) is tricky business. Keeping the entire codebase mounted and running in every environment can lead to slow test suites that sap away developer time between runs. There has to be an alternative to integration tests that are &ldquo;just as good&rdquo; and prevent bugs and regressions.</p>
+
+<p>One alternative that seems obvious and supported by resources online is mocking HTTP interaction with fixture files. For instance, when the test suite requests <code>/users.json</code>, return a pre-determined JSON blob that has the list of users. Ideally, this JSON reflects the current state of the back end API 100% of the time. What happens if this JSON no longer reflects the state of the back end? <strong>Bugs get introduced and users will be affected</strong>. What happens when a developer wants to regenerate a fixture that was generated with data they don&rsquo;t have? <strong>The developer will make concessions and introduce potential bugs.</strong></p>
+
+<p>I was thinking about how to solve this problem, always ensuring that the back end and front end are in sync. The solution should have these properties:</p>
+
+<ul>
+<li>Generate fixtures based on API end-points.</li>
+<li>Be up to date 100% of the time, without developer thought.</li>
+<li>Alert a back end developer when they are changing something that could affect the front end.</li>
+<li>Reproducibility on all developer machines. If two developers run it independently, they get the same result.</li>
+</ul>
+
+<h2>Solution</h2>
+
+<p>My solution involves capturing the HTTP response from test cases, and writing these out to disk in files that can be consumed by a front end test suite. The test cases themselves generate the fixtures, so the developer only has to run the back end suite before the front end suite when they make a change to ensure everything is up to date. One great property about test suites is that they involve consistent data setup across all developer machines, although they may involve random data which must be accounted for.</p>
+
+<p>In RSpec/Rails, a developer can write the following spec which will generate the proper fixture:</p>
+
+<pre><code class="ruby">describe &quot;GET index&quot; do
+  it &quot;is successful&quot;, fixture: &quot;widgets/index.json&quot; do
+    get :index
+    expect(response).to be_success
+  end
+end
+</code></pre>
+
+<p>The developer does not need to think about the fixture itself, only the particular test case they are looking to mock out. If the fixture changes between invocations, their test will fail and they will be aware that they might be introducing a bug. They can delete the file to regenerate it.</p>
+
+<p>One caveat of this is that data can easily change between invocations of the test. For example, <code>*_id, created_at, updated_at</code> are all fields that can change frequently. As a solution for this, I propose allowing for certain keys to be ignored (and implemented it out of the box in rspec-rcv gem).</p>
+
+<h2>Gem</h2>
+
+<p>I&rsquo;ve put this together into a gem called rspec-rcv (reverse of VCR). If you have seen this testing paradigm before, let me know! I couldn&rsquo;t find anything in my research and from discussing with experienced software engineers. Who knows, maybe it will help inspire a better name?</p>
+
+<p>The gem is at <a href="https://github.com/SalesLoft/rspec-rcv">https://github.com/SalesLoft/rspec-rcv</a> and is available from download on <a href="https://rubygems.org/gems/rspec-rcv">rubygems.org</a>.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/testing.html">testing</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <!--
+    <aside>
+      <h2>Recent Articles</h2>
+      <ol>
+          <li><a href="/2016/05/07/visual-regression-testing.html">Visual Regression Testing in Capybara</a> <span>May  7</span></li>
+          <li><a href="/2015/12/03/exceptional-starts-with-a-choice.html">Exceptional Starts with a Choice</a> <span>Dec  3</span></li>
+          <li><a href="/2015/11/10/performance-fixes.html">Identifying and Fixing Web Application Performance Problems</a> <span>Nov 10</span></li>
+          <li><a href="/2015/07/26/front-back-test-parity.html">Keeping Front End / Back End Test Parity</a> <span>Jul 26</span></li>
+          <li><a href="/2015/05/13/learning-things.html">Learning New Languages, Frameworks, Tools</a> <span>May 13</span></li>
+          <li><a href="/2014/12/04/weight-wizard.html">The Weight of the Wizard</a> <span>Dec  4</span></li>
+      </ol>
+
+      <h2>Tags</h2>
+      <ol>
+          <li><a href="/tags/testing.html">testing (2)</a></li>
+          <li><a href="/tags/values.html">values (3)</a></li>
+          <li><a href="/tags/performance.html">performance (1)</a></li>
+      </ol>
+
+      <h2>By Year</h2>
+      <ol>
+          <li><a href="/2016.html">2016 (1)</a></li>
+          <li><a href="/2015.html">2015 (4)</a></li>
+          <li><a href="/2014.html">2014 (1)</a></li>
+      </ol>
+    </aside>
+    -->
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
