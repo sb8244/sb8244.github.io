@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Tips for Taking Twilio to Production</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>Tips for Taking Twilio to Production</h1>
+      <p>I&rsquo;ve been fortunate to work with the <a href="https://www.twilio.com" target="_blank">Twilio</a> API at each of my professional jobs. In fact,
+I&rsquo;ve often said that I&rsquo;ll end up integrating with Twilio when I start my own company. The value that Twilio provides
+is pretty incredible, making it possible to easily handle calls, SMS, and other telecom functionality. I&rsquo;ve put
+together some tips if you&rsquo;re looking to use and ship Twilio Voice to your customers. Some of these tips will be development
+related and others will be business requirement related that you may not consider up-front.</p>
+
+<ul>
+<li>Utilize subaccounts for customer separation</li>
+<li>Fully understand billing and how to get usage for any account</li>
+<li>Provide instructional material / troubleshooting for customer environments</li>
+<li>Use ngrok to make local development a breeze</li>
+<li>Understand latency requirements of your TwiML endpoints</li>
+</ul>
+
+<h2>Utilize subaccounts for customer separation</h2>
+
+<p>Twilio supports <a href="https://support.twilio.com/hc/en-us/articles/223136587-What-is-a-subaccount-" target="_blank">subaccounts</a> which provide
+a way to separate customer environments into many mini environments. Using subaccounts will allow your phone numbers, apps,
+billing, etc. to be completely separated from each other. This removes the possibility of allowing customer A to use customer B&rsquo;s
+phone numbers when placing calls, for instance.</p>
+
+<p>Aside from separation being a good practice that might save you in the case of a programming bug, the bigger reason is that Twilio&rsquo;s
+billing will be broken out per subaccount. While the credit card on file for the main account will be used to pay for services, the
+billing and usage records can be seen per subaccount. There is no other way (short of aggregating all calls yourself) to do
+this billing delineation. Even if you are able to aggregate the cost per call, there may be other charges that you cannot predict
+which aren&rsquo;t as easy to separate when using 1 account.</p>
+
+<p>When you&rsquo;re using subaccounts, you can treat all API calls exactly the same, the difference is that they are made with a different
+API credential. While you have to handle creation and maintenance of the subaccounts, your coding shouldn&rsquo;t be much more difficult.</p>
+
+<h2>Fully understand billing and how to get usage for any account</h2>
+
+<p>On a similar note as using subaccounts for billing, get ahead of what types of charges you will accrue and why.
+Twilio doesn&rsquo;t provide an interface to see your costs per subaccount without viewing every single subaccount individually.
+You may need to write custom code using the <a href="https://www.twilio.com/docs/api/rest/usage-records" target="_blank">UsageRecord API</a> which can be placed
+into your database of choice and aggregated as needed in order to achieve costs per subaccount.</p>
+
+<p>On top of your actual bill, the usage per subaccount can be very important. Despite Twilio being awesome at fraud prevention, it
+will happen that fraudsters try to target your application. They place calls through high-cost routes and siphon the money that
+Twilio pays to use those routes. You can get ahead of this by setting up <a href="https://www.twilio.com/docs/api/rest/usage-triggers" target="_blank">UsageTriggers</a>.
+Using these triggers will allow you to be alerted when certain spending thresholds are passed in Twilio.</p>
+
+<p>From a business perspective, I would recommend connecting with your financial team to make sure they have what they need to document
+the Twilio charges correctly.</p>
+
+<h2>Provide instructional material / troubleshooting for customer environments</h2>
+
+<p>Telecom is hard, for the service providers and for your customers. Voice data requires a reliable internet and computer setup.
+You will absolutely run into issues where customers are not able to use Twilio services due to issues on their end which may
+not be obvious even after troubleshooting.</p>
+
+<p>Do research into VoIP requirements and prepare material for your own customers. Maintain your own knowledge base with up to date
+resolutions based on your learnings over time. Never dismiss an issue being something very simple like a microphone not working
+or a bad network.</p>
+
+<p><a href="https://networktest.twilio.com" target="_blank">networktest.twilio.com</a> is a great resource for doing site surveys for customers. I suggest running
+10 60s tests over 10 minutes and taking the minimum result as the stable network available for VoIP.</p>
+
+<h2>Use ngrok to make local development a breeze</h2>
+
+<p>This one might be clear to most people who have done Twilio development. However, I felt that I needed to include this tip as
+<a href="https://ngrok.io" target="_blank">ngrok</a> is my #1 Twilio development tool; I wouldn&rsquo;t be able to develop easily without it. ngrok provides tunnels from
+the open internet to a local port on your machine. You can point ngrok to your local server and then Twilio can access it over
+the internet without any firewall changes.</p>
+
+<p>ngrok does cost money, but I&rsquo;ve gotten by on the free tier so far. It requires updating any TwiML apps when you restart ngrok,
+but it will operate the same otherwise.</p>
+
+<p>Don&rsquo;t just use ngrok for a simple tunnel. Make use of the local admin port (4040) to see what traffic / responses have been proxied through
+your server. This is invaluable to diagnose why Twilio or your server choked on a request.</p>
+
+<h2>Understand latency requirements of your TwiML endpoints</h2>
+
+<p>Telecom is very latency sensitive. When Twilio initiates a phone call, it&rsquo;s going to do at least 1 round trip to
+your server, if not more depending on your setup. If your server is struggling to keep up with web requests and holds them in
+a queue, you will end up dropping or delaying your phone calls.</p>
+
+<p>Consider placing your Twilio endpoints on dedicated servers that aren&rsquo;t serving other traffic in order to avoid latency spikes
+caused by other sections of your application. Also ensure that your Twilio endpoints are fast in normal use case to decrease your
+time spent on each request.</p>
+
+<p>Most importantly, keep an eye on your throughput and performance and setup alerts for when something goes wrong.</p>
+
+<hr>
+
+<p>I hope that these tips help you out with your Twilio implementation. You&rsquo;re sure to learn more as you deploy your first application,
+or scale an existing application, but the growing pains will be well worth it in the end.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+
+    </script>
+  </body>
+</html>

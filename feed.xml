@@ -4,10 +4,108 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2016-05-06T20:00:00-04:00</updated>
+  <updated>2017-09-02T20:00:00-04:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>Tips for Taking Twilio to Production</title>
+    <link rel="alternate" href="https://stephenbussey.com/2017/09/03/tips-for-taking-twilio-to-production.html"/>
+    <id>https://stephenbussey.com/2017/09/03/tips-for-taking-twilio-to-production.html</id>
+    <published>2017-09-02T20:00:00-04:00</published>
+    <updated>2017-09-03T00:51:54-04:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I&amp;rsquo;ve been fortunate to work with the &lt;a href="https://www.twilio.com" target="_blank"&gt;Twilio&lt;/a&gt; API at each of my professional jobs. In fact,
+I&amp;rsquo;ve often said that I&amp;rsquo;ll end up integrating with Twilio when I start my own company. The value that Twilio provides
+is pretty incredible, making it possible to easily handle calls, SMS, and other telecom functionality. I&amp;rsquo;ve put
+together some tips if you&amp;rsquo;re looking to use and ship Twilio Voice to your customers. Some of these tips will be development
+related and others will be business requirement related that you may not consider up-front.&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Utilize subaccounts for customer separation&lt;/li&gt;
+&lt;li&gt;Fully understand billing and how to get usage for any account&lt;/li&gt;
+&lt;li&gt;Provide instructional material / troubleshooting for customer environments&lt;/li&gt;
+&lt;li&gt;Use ngrok to make local development a breeze&lt;/li&gt;
+&lt;li&gt;Understand latency requirements of your TwiML endpoints&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2&gt;Utilize subaccounts for customer separation&lt;/h2&gt;
+
+&lt;p&gt;Twilio supports &lt;a href="https://support.twilio.com/hc/en-us/articles/223136587-What-is-a-subaccount-" target="_blank"&gt;subaccounts&lt;/a&gt; which provide
+a way to separate customer environments into many mini environments. Using subaccounts will allow your phone numbers, apps,
+billing, etc. to be completely separated from each other. This removes the possibility of allowing customer A to use customer B&amp;rsquo;s
+phone numbers when placing calls, for instance.&lt;/p&gt;
+
+&lt;p&gt;Aside from separation being a good practice that might save you in the case of a programming bug, the bigger reason is that Twilio&amp;rsquo;s
+billing will be broken out per subaccount. While the credit card on file for the main account will be used to pay for services, the
+billing and usage records can be seen per subaccount. There is no other way (short of aggregating all calls yourself) to do
+this billing delineation. Even if you are able to aggregate the cost per call, there may be other charges that you cannot predict
+which aren&amp;rsquo;t as easy to separate when using 1 account.&lt;/p&gt;
+
+&lt;p&gt;When you&amp;rsquo;re using subaccounts, you can treat all API calls exactly the same, the difference is that they are made with a different
+API credential. While you have to handle creation and maintenance of the subaccounts, your coding shouldn&amp;rsquo;t be much more difficult.&lt;/p&gt;
+
+&lt;h2&gt;Fully understand billing and how to get usage for any account&lt;/h2&gt;
+
+&lt;p&gt;On a similar note as using subaccounts for billing, get ahead of what types of charges you will accrue and why.
+Twilio doesn&amp;rsquo;t provide an interface to see your costs per subaccount without viewing every single subaccount individually.
+You may need to write custom code using the &lt;a href="https://www.twilio.com/docs/api/rest/usage-records" target="_blank"&gt;UsageRecord API&lt;/a&gt; which can be placed
+into your database of choice and aggregated as needed in order to achieve costs per subaccount.&lt;/p&gt;
+
+&lt;p&gt;On top of your actual bill, the usage per subaccount can be very important. Despite Twilio being awesome at fraud prevention, it
+will happen that fraudsters try to target your application. They place calls through high-cost routes and siphon the money that
+Twilio pays to use those routes. You can get ahead of this by setting up &lt;a href="https://www.twilio.com/docs/api/rest/usage-triggers" target="_blank"&gt;UsageTriggers&lt;/a&gt;.
+Using these triggers will allow you to be alerted when certain spending thresholds are passed in Twilio.&lt;/p&gt;
+
+&lt;p&gt;From a business perspective, I would recommend connecting with your financial team to make sure they have what they need to document
+the Twilio charges correctly.&lt;/p&gt;
+
+&lt;h2&gt;Provide instructional material / troubleshooting for customer environments&lt;/h2&gt;
+
+&lt;p&gt;Telecom is hard, for the service providers and for your customers. Voice data requires a reliable internet and computer setup.
+You will absolutely run into issues where customers are not able to use Twilio services due to issues on their end which may
+not be obvious even after troubleshooting.&lt;/p&gt;
+
+&lt;p&gt;Do research into VoIP requirements and prepare material for your own customers. Maintain your own knowledge base with up to date
+resolutions based on your learnings over time. Never dismiss an issue being something very simple like a microphone not working
+or a bad network.&lt;/p&gt;
+
+&lt;p&gt;&lt;a href="https://networktest.twilio.com" target="_blank"&gt;networktest.twilio.com&lt;/a&gt; is a great resource for doing site surveys for customers. I suggest running
+10 60s tests over 10 minutes and taking the minimum result as the stable network available for VoIP.&lt;/p&gt;
+
+&lt;h2&gt;Use ngrok to make local development a breeze&lt;/h2&gt;
+
+&lt;p&gt;This one might be clear to most people who have done Twilio development. However, I felt that I needed to include this tip as
+&lt;a href="https://ngrok.io" target="_blank"&gt;ngrok&lt;/a&gt; is my #1 Twilio development tool; I wouldn&amp;rsquo;t be able to develop easily without it. ngrok provides tunnels from
+the open internet to a local port on your machine. You can point ngrok to your local server and then Twilio can access it over
+the internet without any firewall changes.&lt;/p&gt;
+
+&lt;p&gt;ngrok does cost money, but I&amp;rsquo;ve gotten by on the free tier so far. It requires updating any TwiML apps when you restart ngrok,
+but it will operate the same otherwise.&lt;/p&gt;
+
+&lt;p&gt;Don&amp;rsquo;t just use ngrok for a simple tunnel. Make use of the local admin port (4040) to see what traffic / responses have been proxied through
+your server. This is invaluable to diagnose why Twilio or your server choked on a request.&lt;/p&gt;
+
+&lt;h2&gt;Understand latency requirements of your TwiML endpoints&lt;/h2&gt;
+
+&lt;p&gt;Telecom is very latency sensitive. When Twilio initiates a phone call, it&amp;rsquo;s going to do at least 1 round trip to
+your server, if not more depending on your setup. If your server is struggling to keep up with web requests and holds them in
+a queue, you will end up dropping or delaying your phone calls.&lt;/p&gt;
+
+&lt;p&gt;Consider placing your Twilio endpoints on dedicated servers that aren&amp;rsquo;t serving other traffic in order to avoid latency spikes
+caused by other sections of your application. Also ensure that your Twilio endpoints are fast in normal use case to decrease your
+time spent on each request.&lt;/p&gt;
+
+&lt;p&gt;Most importantly, keep an eye on your throughput and performance and setup alerts for when something goes wrong.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;I hope that these tips help you out with your Twilio implementation. You&amp;rsquo;re sure to learn more as you deploy your first application,
+or scale an existing application, but the growing pains will be well worth it in the end.&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>Visual Regression Testing in Capybara</title>
     <link rel="alternate" href="https://stephenbussey.com/2016/05/07/visual-regression-testing.html"/>
@@ -81,7 +179,7 @@ cropped_image = Magick::Image.read(image)[0].crop(
 
 &lt;h2&gt;The Code&lt;/h2&gt;
 
-&lt;p&gt;I can&amp;rsquo;t promise support for your codebase, so I have chosen to not gemify this code. I&amp;rsquo;ve put it up as a &lt;a href="https://gist.github.com/sb8244/55246c51e469524f2abd0c17dd3c574e"&gt;gist&lt;/a&gt; instead. Note that this requires Rails, Capybara, and RMagick gems. You could adapt it to not be Rails dependent, if you are on something else.&lt;/p&gt;
+&lt;p&gt;I can&amp;rsquo;t promise support for your codebase, so I have chosen to not gemify this code. I&amp;rsquo;ve put it up as a &lt;a href="https://gist.github.com/sb8244/55246c51e469524f2abd0c17dd3c574e" target="_blank"&gt;gist&lt;/a&gt; instead. Note that this requires Rails, Capybara, and RMagick gems. You could adapt it to not be Rails dependent, if you are on something else.&lt;/p&gt;
 </content>
   </entry>
   <entry>
@@ -123,7 +221,7 @@ cropped_image = Magick::Image.read(image)[0].crop(
 &lt;p&gt;Exceptional starts with a choice.&lt;/p&gt;
 &lt;/blockquote&gt;
 
-&lt;p&gt;&lt;em&gt;I&amp;rsquo;ve already said this, but it&amp;rsquo;s worth a final note.&lt;/em&gt; Being exceptional is a choice that can be made. It isn&amp;rsquo;t instant and requires hard work and motivation, but it is possible. Starting each day with the &lt;a href="https://en.wikipedia.org/wiki/Intentional_living"&gt;intention&lt;/a&gt; to be exceptional will eventually pay off.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;I&amp;rsquo;ve already said this, but it&amp;rsquo;s worth a final note.&lt;/em&gt; Being exceptional is a choice that can be made. It isn&amp;rsquo;t instant and requires hard work and motivation, but it is possible. Starting each day with the &lt;a href="https://en.wikipedia.org/wiki/Intentional_living" target="_blank"&gt;intention&lt;/a&gt; to be exceptional will eventually pay off.&lt;/p&gt;
 </content>
   </entry>
   <entry>
@@ -239,7 +337,7 @@ end
 
 &lt;p&gt;I&amp;rsquo;ve put this together into a gem called rspec-rcv (reverse of VCR). If you have seen this testing paradigm before, let me know! I couldn&amp;rsquo;t find anything in my research and from discussing with experienced software engineers. Who knows, maybe it will help inspire a better name?&lt;/p&gt;
 
-&lt;p&gt;The gem is at &lt;a href="https://github.com/SalesLoft/rspec-rcv"&gt;https://github.com/SalesLoft/rspec-rcv&lt;/a&gt; and is available from download on &lt;a href="https://rubygems.org/gems/rspec-rcv"&gt;rubygems.org&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;The gem is at &lt;a href="https://github.com/SalesLoft/rspec-rcv" target="_blank"&gt;https://github.com/SalesLoft/rspec-rcv&lt;/a&gt; and is available from download on &lt;a href="https://rubygems.org/gems/rspec-rcv" target="_blank"&gt;rubygems.org&lt;/a&gt;.&lt;/p&gt;
 </content>
   </entry>
   <entry>
@@ -278,24 +376,6 @@ This is one engineers most often skip over. Talk about what you&amp;rsquo;re wor
 &lt;p&gt;By sharing what you&amp;rsquo;re working on (probably to people who know what you&amp;rsquo;re talking about), you will let people know that you care about bettering your skillset. You will appear as more self-starting, determined, and you will hopefully gain confidence in the new skillset.&lt;/p&gt;
 
 &lt;p&gt;&lt;strong&gt;What have I missed? How do you acclimate to a new language or framework?&lt;/strong&gt;&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>The Weight of the Wizard</title>
-    <link rel="alternate" href="https://stephenbussey.com/2014/12/04/weight-wizard.html"/>
-    <id>https://stephenbussey.com/2014/12/04/weight-wizard.html</id>
-    <published>2014-12-03T19:00:00-05:00</published>
-    <updated>2017-09-02T16:49:20-04:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;Startups fly around at a million miles per hour. Just take a look on Hacker News, or Tech Crunch, or any of the countless other news outlets revolving around tech. When I look at the hubs, I see stories about scrappy developers who are working on the next big idea and hoping to make it big. These articles hit on a great part of being a software engineer right now, we can build anything that we put our minds to. However, how did these engineers come about finding and executing ideas? A software engineer will have many ideas bounced off them in their career, and many of these ideas will be humble requests from normal non-engineers. The real wizard must know how to look past the dollar bills or the latest Hacker News trends to find the ideas that might not be glamorous, but will make an impact.&lt;/p&gt;
-
-&lt;p&gt;Software engineers out there can most likely relate to the countless times that individuals in their business organization, school, or family pitched an idea for a product or tool. Analyzing the impact of the product is the first step to knowing if it is worth the time. A product could potentially have significant impact on the daily life of a few individuals or be a generic consumer idea that doesn&amp;rsquo;t directly benefit anyone in particular. An engineer drawn to trends online might look at the first option as not having much direct benefit to them. It certainly won&amp;rsquo;t generate revenue if only a few people benefit and it might even be a time-sink in the end. However, the gratitude and favor that the development will bring to those people may potentially be worth intangibly more over time. Looking past the latest trends and analyzing the direct benefit is a good start to determining if a project is worth your time.&lt;/p&gt;
-
-&lt;p&gt;So how do the best engineers that I know choose a project? They look for areas that are going to make an impact. However, they don&amp;rsquo;t get caught up in whether the impact will be 10 people or 10,000.&lt;/p&gt;
-
-&lt;p&gt;What do you think? How do you pick projects and balance all of the project ideas that people throw at you?&lt;/p&gt;
 </content>
   </entry>
 </feed>
