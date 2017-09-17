@@ -1,0 +1,265 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Get Your Rails out of My Ruby - HTTP & Controllers</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>Get Your Rails out of My Ruby - HTTP & Controllers</h1>
+      <p>On Friday September 22 (2017), I&rsquo;ll be presenting a talk at <a href="http://connect.tech/" target="_blank">connect.tech</a> conference entitled &ldquo;Get Your
+Rails out of My Ruby&rdquo;. This talk is going to be looking at alternatives to writing Ruby code in a Rails application that don&rsquo;t
+involve doing everything the &ldquo;Rails way.&rdquo; This post and future posts leading up to the talk will look at certain common areas
+where Rails is used; this post will be about controllers and your HTTP interface.</p>
+
+<h2>Rails Controllers - Benefits &amp; Challenges</h2>
+
+<p>Rails has done so much for the Ruby community and is arguably the best collection of &ldquo;getting started practices&rdquo; that exists
+for web development. Other frameworks are catching up to it, but it has been innovating in its own way to keep pace. Rails handles
+creating a web interface gracefully and provides mechanisms to do it securely (versus rolling it all yourself from scratch).
+ActionController, specifically, has a few large benefits (not an exhaustive list):</p>
+
+<ul>
+<li>Clean interface to write routes and controllers quickly</li>
+<li>ActionController::Parameters for securely handling parameters, beyond a simple Hash</li>
+<li>Easy to use router</li>
+</ul>
+
+<p>With these benefits, I&rsquo;ve seen some challenges from relying on Rails for everything web-interface related:</p>
+
+<ul>
+<li>The default use of controllers leads to web &amp; application code coupled together tightly</li>
+<li>Many ways to achieve objectives, some better and some worse than others. How do you know what&rsquo;s better when getting started?</li>
+<li>Router is flexible and will let you do things you maybe shouldn&rsquo;t be (1 controller with many endpoints)</li>
+<li>Larger learning curve than may be necessary due to generic functionality</li>
+</ul>
+
+<p>When getting started with a new application or product, these tradeoffs might be entirely acceptable, and I would argue that they
+most likely are acceptable for a majority of use cases. However, these tradeoffs begin to appear less worth it as an application,
+business, or customer base increases in size. Specifically, the tight coupling of web and application code.</p>
+
+<h2>Web / Application Coupling</h2>
+
+<p>Your app is not a web app; your app is more than that. Your application is solving problems for businesses or consumers. Your application
+has a problem domain that isn&rsquo;t just &ldquo;the web.&rdquo; When building your application, are you writing and communicating in your business&rsquo;s
+context, or in the context of &ldquo;the web?&rdquo;</p>
+
+<p><a href="https://en.wikipedia.org/wiki/Conway%27s_law" target="_blank">Conway&rsquo;s law</a> says that your application design will reflect the communication structure
+of your business. This is due to the needs of individuals in the organization to communicate effectively with each other. Let&rsquo;s look
+at an example of how this might play out in application code:</p>
+
+<p>Your banking software is designed to support operations of the tellers for your bank branches. When customers come into the bank, they
+submit &ldquo;withdrawal slips&rdquo; to the tellers, who process these slips and issue &ldquo;money withdrawals&rdquo; back to the customers. Your company has
+codified this business process for the software written for the tellers, which is accessed via a web interface on their computers.
+When designing the classes for this software, what are the &ldquo;withdrawal slips&rdquo; and &ldquo;money withdrawals&rdquo; called?</p>
+
+<p>In the &ldquo;Rails way&rdquo; mindset, these might end up being simple &ldquo;Controller Actions&rdquo; which produce &ldquo;Views&rdquo; viewed by the tellers.
+The slips contents are passed around the controllers by &ldquo;params&rdquo;. The web application creeps into the code in this way,
+naming concepts by Rails concepts rather than business domains. The web / application domains are now coupled with each other.</p>
+
+<h2>Problems with Coupling</h2>
+
+<p>Being real, this tight naming coupling isn&rsquo;t going to cripple your app; you may not even notice side effects for a while. However,
+slowly things might end up happening:</p>
+
+<ul>
+<li>Engineers become unable to communicate in the organization without mentally translating concepts</li>
+<li>Engineers doing refactors are struggling to discover the business intents, as the business concepts are not obvious</li>
+<li>Tighter coupling has caused bugs in one section to propagate down to another section of code, causing worse problems</li>
+<li>No mapping of language was ever created, people aren&rsquo;t sure of the mapping anymore</li>
+</ul>
+
+<p>All of these problems are going to escalate to the business level at some point, they aren&rsquo;t simply engineering issues. Particularly
+decreased productivity and large refactors to reduce coupling.</p>
+
+<div style="text-align: center">
+  <img src="/images/get-your-rails-out/traditional-design.png" alt="traditional rails coupling, large seam" />
+  <div>
+    <small>
+      <i>Example of Rails design that introduces a high degree of coupling</i>
+    </small>
+  </div>
+</div>
+
+<p>In the above image, a traditional Rails Way design is shown. Rails routes the request to a controller, which utilizes service objects
+to implement business logic. These service objects are tied to the controller if any business logic is implemented in the controller,
+such as parameter defaults, safety checks, etc. It is possible to reduce coupling by making the controllers as dumb as possible, but
+I&rsquo;m not sure that this plays out as expected in the real world.</p>
+
+<p>In my view, the biggest issue with this design is that the application logic ends up tied in some way to a controller. This makes it
+not possible to invoke the business logic without reading the controller, understanding it, and duplicating that setup somewhere else.
+This introduces the above issues, such as lack of clear understanding, tight coupling, and more difficult refactors.</p>
+
+<h2>A different way?</h2>
+
+<p>What if our business logic was able to be separated from the web logic via object separation. This is fairly common in the Rails
+world with the introduction of &ldquo;service objects.&rdquo; These objects are wrappers to encapsulate behavior. Instead of the &ldquo;withdrawal slip&rdquo;
+being represented by the <code>params</code> of a <code>Request</code>, perhaps there is a <code>WithdrawalSlip</code> object which has codified that business concept.
+The controller will then create a <code>WithdrawalSlip</code> and process it via a <code>MoneyWithdrawalProcess</code>.</p>
+
+<p>This small alternative immediately provides some benefits to the engineers and organization. The concepts are apparent in the code,
+and the engineering team is able to make sense of the names compared to how the business operates. The changes allows the codebase
+to get further, but there are still some problems. Every endpoint for the banking interface now has to create and manage respective
+objects, and construct results into responses for the tellers. The interface has become less Rails specific, but actual functionality
+is still heavily reliant on Rails. This means that engineers unfamiliar with the codebase (new hires) may end up doing something
+The Rails Way rather than the way that has been established by the team, simply because it&rsquo;s possible and they are not familiar with
+the team&rsquo;s way yet. This might lead to tension (&ldquo;You only do it this way because you&rsquo;re afraid of change!&rdquo;) or code erosion over time,
+neither of which are good.</p>
+
+<h2>Separating business logic completely away from the web logic</h2>
+
+<p>What if the web logic was completely separated from the business logic? I don&rsquo;t mean the service object extraction mentioned previously,
+but an actual fully operating application that doesn&rsquo;t involve the web at all. This is possible to do, but involves separating the
+two concepts and only combining them at very small seams.</p>
+
+<p>The actual development of the application logic is very specific to your use case, which makes it hard to offer suggestions on how
+to achieve it. However, a general goal should be to have the entire application &ldquo;runnable via CLI.&rdquo; This creates an artificial goal
+of not having code that is deeply integrated with being accessed via the web. Another artificial goal is that all tests for the
+application should not involve the web at all. There are no &ldquo;controllers&rdquo; nor &ldquo;actions&rdquo; at this point, just your business logic.</p>
+
+<p>When this is achieved for the business logic, new development questions might be &ldquo;how do we want to name and design this functionality?&rdquo;,
+rather than &ldquo;how can I build this functionality in Rails?&rdquo; Abstractions and patterns could be established in the code that aren&rsquo;t
+apparent otherwise, due to the artificial web limitations.</p>
+
+<div style="text-align: center">
+  <img src="/images/get-your-rails-out/decoupled-design.png" alt="decoupled rails design, small seam" />
+  <div>
+    <small>
+      <i>Example of Rails design that introduces a low degree of coupling</i>
+    </small>
+  </div>
+</div>
+
+<p>In the above example, a design is proposed that introduces a single seam between a controller (singular) and the application. This
+design introduces a very low level of coupling, and the code that is coupled is generic code implemented for all endpoints. In practice,
+I&rsquo;ve found that this seam can be as low as three files: routing, request, response.</p>
+
+<p>The most significant advantage to this design is that the application is completely able to be executed independent of a web request,
+maybe the business needs some CLI runners, or a fancy web socket based API. This design would make it possible to implement these
+interfaces in a low number of files, without changing the application at all.</p>
+
+<h2>Creating a seam with Rails</h2>
+
+<p>I&rsquo;ve made a lot of suggestions about taking your code away from Rails, so it seems that I should advise on how to create a seam
+with Rails. Rails still solves a lot of problems that micro-frameworks like Sinatra just don&rsquo;t solve. It&rsquo;s also nice to be able to
+use something that Rails provides when you really do need it. For these reasons, I would suggest creating the seam with Rails rather
+than creating a seam to another framework. However, there is nothing so far that indicates you need to use Rails for web! Your
+entire business logic is represented without Rails web code present, and could be accessed via any type of interface: Rails,
+Sinatra, CLI, Websockets, etc.</p>
+
+<p>One way to interface with Rails is by defining routes in the router, pointed at some controller structure that you desire. A
+<a href="https://en.wikipedia.org/wiki/Front_controller" target="_blank">front controller</a> becomes a viable choice here, as the single controller/action
+creates a very small seam with the application. You could also still approach 1 action per endpoint, but your seam will be much
+larger and could be prone to leaking through or being difficult to maintain.</p>
+
+<p>Let&rsquo;s look at how you might approach the router:</p>
+
+<pre><code class="ruby"># config/application.rb
+# Setup your routes via a custom routes file that properly autoloads locally like routes.rb does
+config.paths[&quot;config/routes.rb&quot;].unshift(Rails.root.join(&quot;config&quot;, &quot;custom_routes.rb&quot;))
+</code></pre>
+
+<pre><code class="ruby"># config/routes.rb
+# Integrate your routes via a context adapter
+Rails.application.routes.draw do
+  RailsAdapters::Routes.define_routes(self)
+end
+</code></pre>
+
+<pre><code class="ruby"># lib/rails_adapters/routes.rb
+# Define your routes on the context provided
+
+class RailsAdapters::Routes
+  def self.define_routes(context)
+    new(MyRouter.instance).call(context)
+  end
+
+  def intialize(router)
+    @router = router
+  end
+
+  def call(context)
+    @router.routes.each do |route|
+      # route.type =&gt; :get | :post | :put | :delete
+      # route.path =&gt; &quot;api/money_withdrawls/:id&quot;
+      options = { controller: &quot;front&quot;, action: &quot;execute&quot;, executor: route.executor }
+      context.send route.type, route.path, options
+    end
+  end
+end
+</code></pre>
+
+<pre><code class="ruby"># app/controllers/front_controller.rb
+class FrontController &lt; ApplicationController
+  def execute # routing happened previously
+    request = RailsAdapters::Request.new(self) # request adapter
+    response = params[:executor].new(request).call # response adapter
+    render json: response, status: response.status # RailsAdapters::Response.new(self).call(response) rather?
+  end
+end
+</code></pre>
+
+<p><em>The three steps I mentioned previously are visible here: routing, request, response.</em></p>
+
+<p>So far, I&rsquo;ve offered a way to define some routes in a separate place than the routes file. This may not seem great, as there is
+not a ton of code, but that is the point! There doesn&rsquo;t need to be a ton of code to create this seam with Rails. With a small
+FrontController that can handle the clue between Rails request concepts and responses, we&rsquo;re able to create lightweight adapters.
+If we wanted to move this code to something like Sinatra, we would rewrite these adapters only, 0 business logic changes.</p>
+
+<p>One technique that can really help writing these adapters is the &ldquo;context&rdquo; concept above. By passing <code>self</code> in as a parameter to
+a method, every method on that context will be available in the consuming class. In this way, we could access <code>context.params</code>,
+<code>context.render</code>, <code>context.get</code>, etc. The code that is adapting can have full access to the Rails context, without necessarily
+being tied to Rails.</p>
+
+<h2>Wrap it up&hellip;</h2>
+
+<p>If your approach your business code as a separate entity from your Rails (or framework in general) code, you will be able to
+write the code that you <em>want</em> to write, rather than the code you&rsquo;re <em>forced</em> to write. Look for design patterns that suit
+your needs and make sense in your context. I utilize a &ldquo;front controller&rdquo; pattern, but there are other patterns for web interfaces
+that could work for you! If you&rsquo;re tied to The Rails Way, you might miss these patterns and be forced into someone else&rsquo;s
+design choices.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+
+    </script>
+  </body>
+</html>
