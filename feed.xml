@@ -13,7 +13,7 @@
     <link rel="alternate" href="https://stephenbussey.com/2017/09/04/get-your-rails-out-of-my-ruby-http.html"/>
     <id>https://stephenbussey.com/2017/09/04/get-your-rails-out-of-my-ruby-http.html</id>
     <published>2017-09-04T14:33:00-04:00</published>
-    <updated>2017-09-18T08:13:07-04:00</updated>
+    <updated>2017-09-29T15:19:43-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -235,7 +235,7 @@ design choices.&lt;/p&gt;
     <link rel="alternate" href="https://stephenbussey.com/2017/09/03/tips-for-taking-twilio-to-production.html"/>
     <id>https://stephenbussey.com/2017/09/03/tips-for-taking-twilio-to-production.html</id>
     <published>2017-09-02T20:00:00-04:00</published>
-    <updated>2017-09-03T00:51:54-04:00</updated>
+    <updated>2017-09-29T15:19:43-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -333,7 +333,7 @@ or scale an existing application, but the growing pains will be well worth it in
     <link rel="alternate" href="https://stephenbussey.com/2016/05/07/visual-regression-testing.html"/>
     <id>https://stephenbussey.com/2016/05/07/visual-regression-testing.html</id>
     <published>2016-05-06T20:00:00-04:00</published>
-    <updated>2017-09-02T17:16:04-04:00</updated>
+    <updated>2017-09-29T15:19:43-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -409,7 +409,7 @@ cropped_image = Magick::Image.read(image)[0].crop(
     <link rel="alternate" href="https://stephenbussey.com/2015/12/03/exceptional-starts-with-a-choice.html"/>
     <id>https://stephenbussey.com/2015/12/03/exceptional-starts-with-a-choice.html</id>
     <published>2015-12-02T19:00:00-05:00</published>
-    <updated>2017-09-02T16:50:47-04:00</updated>
+    <updated>2017-09-29T15:19:43-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -451,7 +451,7 @@ cropped_image = Magick::Image.read(image)[0].crop(
     <link rel="alternate" href="https://stephenbussey.com/2015/11/10/performance-fixes.html"/>
     <id>https://stephenbussey.com/2015/11/10/performance-fixes.html</id>
     <published>2015-11-09T19:00:00-05:00</published>
-    <updated>2017-09-02T16:50:22-04:00</updated>
+    <updated>2017-09-29T15:19:43-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -516,7 +516,7 @@ Total runtime: 0.065 ms
     <link rel="alternate" href="https://stephenbussey.com/2015/07/26/front-back-test-parity.html"/>
     <id>https://stephenbussey.com/2015/07/26/front-back-test-parity.html</id>
     <published>2015-07-25T20:00:00-04:00</published>
-    <updated>2017-09-02T16:50:08-04:00</updated>
+    <updated>2017-09-29T15:19:43-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
