@@ -4,10 +4,219 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2017-09-04T14:33:00-04:00</updated>
+  <updated>2018-01-07T21:47:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>Designing Elixir Supervisor Trees</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/01/08/designing-elixir-supervisor-trees.html"/>
+    <id>https://stephenbussey.com/2018/01/08/designing-elixir-supervisor-trees.html</id>
+    <published>2018-01-07T21:47:00-05:00</published>
+    <updated>2018-01-07T22:38:03-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;Over the past year, I&amp;rsquo;ve been getting more and more into Elixir. The language and
+paradigm has shifted how I think about coding in Ruby and has been incredibly &lt;em&gt;fun&lt;/em&gt;
+to work with. One of the core concepts of an Elixir application is the supervision tree.
+Let&amp;rsquo;s dive into some patterns that I typically use, along with some real code.&lt;/p&gt;
+
+&lt;h2&gt;Supervisors and Processes&lt;/h2&gt;
+
+&lt;p&gt;A process in Elixir is an isolated unit of execution. Processes have their own stack,
+&amp;ldquo;run queue&amp;rdquo;, and garbage collection. Because of this level of isolation, it helps to think
+of them as small programs that can talk to other small programs in an application. Processes
+are crucial for storing and accessing dynamic data, as well as for implementing transformations
+around data. A process executes all operations in its run queue sequentially, but multiple
+run queues can execute concurrently (leading to true concurrency). If you are curious about this
+specifically, I find
+Hamidreza Soleimani&amp;rsquo;s &lt;a href="https://hamidreza-s.github.io/erlang/scheduling/real-time/preemptive/migration/2016/02/09/erlang-scheduler-details.html" target="_blank"&gt;blog post&lt;/a&gt;
+fascinating.&lt;/p&gt;
+
+&lt;p&gt;A supervisor is a process that manages the lifecycles of child processes. This most often
+comes through as a fault tolerance mechanism. If a process crashes, the parent supervisor
+can choose to restart it, let it stay dead, restart it and all peers, etc. A supervisor
+can supervise other supervisors, which leads to a supervision tree.&lt;/p&gt;
+
+&lt;h2&gt;Modeling a Problem&lt;/h2&gt;
+
+&lt;p&gt;The problem that I&amp;rsquo;m going to discuss today is the model of a game server for the game
+generals.io. This is a turn-based &amp;ldquo;real-time&amp;rdquo; strategy game that involves capturing towns
+with armies and overtaking the enemy generals. Users can queue up moves to execute sequentially
+over turns. This allows complex moves to be planned out and executed without losing time.&lt;/p&gt;
+
+&lt;p&gt;In this problem, there are a few concepts that stick out to me:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Board: A board is the representation of what the current state of the game is. This would
+include the cell types, the state of the armies, the fog of war, etc&lt;/li&gt;
+&lt;li&gt;Command queue: This stores the entire set of commands for the game. It is write-ahead and
+knows what commands have been executed and which are in the future (and on which turn)&lt;/li&gt;
+&lt;li&gt;Player list: Not as obvious as the others, but we need to know what players are in a game,
+and what the mapping is to their login&lt;/li&gt;
+&lt;li&gt;Game: The game contains all of the above things and ticks every so often, progressing the
+gameplay along&lt;/li&gt;
+&lt;li&gt;Game list: Building an online game requires supporting multiple games at once&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;I&amp;rsquo;m going to walk through each of these concepts (in order) and explain the approach I
+took in implementing the supervision tree. First, let&amp;rsquo;s see what that supervision tree
+might look like.&lt;/p&gt;
+
+&lt;h2&gt;Supervision Tree for Our Game&lt;/h2&gt;
+
+&lt;p&gt;What I&amp;rsquo;m about to present doesn&amp;rsquo;t come immediately (well, maybe with more practice),
+and is something that came about through iterations and testing the waters with different
+code. This is the final product, which I&amp;rsquo;ll go into more detail on. The [] syntax indicates
+what the children are.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Application -&amp;gt; [GamesSupervisor, GameRegistry, WebEndpoint]
+GamesSupervisor (1 child type) -&amp;gt; [GameSupervisor (dynamic)]
+GameSupervisor (4 child type) -&amp;gt; [BoardServer, CommandQueueServer, TickServer, PlayerServer]
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;BoardServer &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/board_server.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
+
+&lt;p&gt;When building the game, I started with the board object and naturally progressed into
+the BoardServer. I feel that starting on the inner nodes of the supervisor can make
+it more obvious what the next steps are, rather than trying to plan out everything
+at once.&lt;/p&gt;
+
+&lt;p&gt;Notes on the code:&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;ve found myself trying to keep servers as simple as possible,
+and executing complex logic in plain old modules which don&amp;rsquo;t have any GenServer
+capability. When looking at the BoardServer, I&amp;rsquo;m happy to see that there is no
+real logic in it, other than turn + 1.&lt;/p&gt;
+
+&lt;p&gt;Defining a simple interface is crucial for communication between GenServers. I&amp;rsquo;ve
+found myself getting stuck in between more verbose interfaces in the past and always
+regret whatever brought me there.&lt;/p&gt;
+
+&lt;p&gt;You&amp;rsquo;ll notice that I don&amp;rsquo;t use any of the GenServer helpers to remove boiler plate.
+I&amp;rsquo;ve found that keeping it to pure Elixir makes it easier to read in the long run,
+and increases my consistency across projects.&lt;/p&gt;
+
+&lt;h2&gt;CommandQueueServer &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/command_queue_server.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
+
+&lt;p&gt;Following the theme of keeping GenServers simple, this one is even more simple.
+When I&amp;rsquo;m dealing with a GenServer that really only touches one thing, like this one
+dealing with a Queue implementation, I do like to reach for Agent. Using an Agent
+removes the need to build a real GenServer implementation, and increases the
+readability significantly.&lt;/p&gt;
+
+&lt;p&gt;I don&amp;rsquo;t find myself reaching for an Agent often, and will pull it out to a regular
+GenServer if it gets too complex.&lt;/p&gt;
+
+&lt;h2&gt;PlayerServer &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/player_server.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
+
+&lt;p&gt;This is another simple Agent implementation that I feel like got a little bit sloppy.
+This is due to the use of a Map rather than a custom data structure. To clean up
+this code, I would look at extracting the Map behavior into a specific PlayerList
+module.&lt;/p&gt;
+
+&lt;h2&gt;TickServer &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/tick_server.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
+
+&lt;p&gt;I love this TickServer. One of my favorite lines of code in Elixir has been:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Process.send_after(self(), :start_tick, timeout)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This code is going to send a message from one process to itself, but set for the future.
+This allows creation of non-blocking (while the waiting is happening) GenServer implementations
+that are implemented entirely using native Elixir concepts.&lt;/p&gt;
+
+&lt;p&gt;Another interesting point here is that the TickServer accepts a &lt;code&gt;ticker_fn&lt;/code&gt; in the server
+initialization. We&amp;rsquo;ll see this pop up in our GameServer later. I thought this technique was
+really interesting (and was sort of surprised it worked). It works due to the fact that
+a fn in Elixir can be passed around like any other variable, and Elixir is stateless which
+means that the fn doesn&amp;rsquo;t get any context from where it is defined. Be warned, however, that
+executing a fn in the TickServer is going to block the TickServer until that function
+completes; it is not going to execute in the server that defined the fn.&lt;/p&gt;
+
+&lt;h2&gt;GameSupervisor &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/game_supervisor.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
+
+&lt;p&gt;There&amp;rsquo;s a lot going on in this supervisor, so let&amp;rsquo;s take it slow and just look at a few
+specific concepts.&lt;/p&gt;
+
+&lt;p&gt;The first thing to point out is the use of Registry:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;def start_link(opts = %{game_id: id}) do
+  Supervisor.start_link(__MODULE__, opts, name: {:via, Registry, {get_registry_name(), id}})
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Using the Registry allows for a named dynamic lookup / uniqueness of a GenServer. The
+supervisor is defined by the id passed in, which would prevent two games from ever sharing
+the same id at the same time. As you can imagine, that would be bad. We can take advantage
+of the uniqueness as well, because another GenServer that is started with this id will return
+the pid in the start_link call. We&amp;rsquo;ll see this through in the GamesSupervisor below.&lt;/p&gt;
+
+&lt;p&gt;Another useful code snippet is for looking up a process by type under a supervisor:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;defp find_child_type(sup_pid, type) do
+  Enum.find(Supervisor.which_children(sup_pid), {nil, nil, nil, nil}, fn({mod, _pid, _type, _}) -&amp;gt;
+    mod == type
+  end) |&amp;gt; elem(1)
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;I&amp;rsquo;ve begun putting this in a Utils namespace in my new projects, but the gist is simple.
+By using the supervisor&amp;rsquo;s pid, we can list out all of its children and find the one
+with a given type (or base it on other things). GameSupervisor only has 1 child of
+each type, which makes this work well.&lt;/p&gt;
+
+&lt;p&gt;Our trust &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/game_supervisor.ex#L76" target="_blank"&gt;ticker_fn&lt;/a&gt; is
+defined in this GameSupervisor. The reason I took this approach is that the knowledge of how to tick
+should belong to something separate from what the ticking behavior is. Looking at this now,
+I would probably pull this code into another module since it&amp;rsquo;s so long.&lt;/p&gt;
+
+&lt;h2&gt;GamesSupervisor &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/games_supervisor.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
+
+&lt;p&gt;We&amp;rsquo;ve finally made it to the top of the supervision tree with the GamesSupervisor. This
+supervisor takes advantage of the GameRegistry to provide game lookups:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;def get_game(id, opts \\ []) do
+  options = Keyword.merge([name: __MODULE__], opts)
+  Supervisor.start_child(options[:name], [%{game_id: id}]) |&amp;gt; case do
+    {:error, {:already_started, pid}} -&amp;gt; pid
+    {:error, _} -&amp;gt; nil
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In this case, the GameSupervisor is identified by the id, which will return when
+&lt;code&gt;{:error, {:already_started, pid}}&lt;/code&gt; is returned from the start_child call. I use
+this pattern in nearly every dynamic supervisor that I&amp;rsquo;ve written. I do typically
+implement start/get in the same method (starting if it doesn&amp;rsquo;t exist, getting if it does),
+but I found that to not work well as creating a new game involves several complex
+operations such as board generation.&lt;/p&gt;
+
+&lt;h2&gt;Registry&lt;/h2&gt;
+
+&lt;p&gt;If you use a Registry, you do need to start it as a process in your application. I
+generally just include it at the top level of my
+&lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/application.ex#L9" target="_blank"&gt;Application module&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2&gt;Final Thoughts&lt;/h2&gt;
+
+&lt;p&gt;One good sign that your supervision tree has come together well is a very simple
+mounting of it onto your final Application. Writing &lt;code&gt;supervisor(Generals.GamesSupervisor, [])&lt;/code&gt;
+seems like a very clean interface for interacting with my game supervision tree, and
+I feel good about that.&lt;/p&gt;
+
+&lt;p&gt;Another key thing to think of when writing your supervision tree is what can / will
+execute concurrently. For instance, let&amp;rsquo;s say that your PlayerList is implemented in
+the same GenServer as the Board. If you want to access the PlayerList to see who is
+in a game, it would not be able to run concurrently with Board operations. By splitting
+them up into separate GenServer implementations, they can execute concurrently (keep in
+mind that Elixir automatically distributes across cores).&lt;/p&gt;
+
+&lt;p&gt;I hope this helped or solidified GenServer concepts for you. Please feel free to reach out
+with any cool tips or tricks.&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>Get Your Rails Out Of My Ruby - HTTP &amp; Controllers</title>
     <link rel="alternate" href="https://stephenbussey.com/2017/09/04/get-your-rails-out-of-my-ruby-http.html"/>
@@ -509,57 +718,6 @@ Total runtime: 0.065 ms
 &lt;h2&gt;Conclusion&lt;/h2&gt;
 
 &lt;p&gt;I don&amp;rsquo;t usually end my posts with conclusions, but it is important to re-iterate that performance optimization is an open book where one solution won&amp;rsquo;t be the end all. I&amp;rsquo;ve learned something new almost every time I&amp;rsquo;ve went in for speed improvements, and I come out happy every single time. Give it a shot and let me know if you find any cool techniques!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Keeping Front End / Back End Test Parity</title>
-    <link rel="alternate" href="https://stephenbussey.com/2015/07/26/front-back-test-parity.html"/>
-    <id>https://stephenbussey.com/2015/07/26/front-back-test-parity.html</id>
-    <published>2015-07-25T20:00:00-04:00</published>
-    <updated>2017-09-29T15:19:43-04:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;One of the best aspects of being a Rails developer is the attitude of testing from the community (always test, duh!). Having an extensive test suite allows one to keep a Rails app relatively low on bugs, and ensures the best experience for engineers and users. It is also easy to translate this attitude of testing to a front end framework like React or AngularJS, the target of this blog post. One thing that is not easy, however, is ensuring proper integration between a front end and back end while trying to avoid costly integration tests. I would like to propose a novel way of approaching this integration point that I haven&amp;rsquo;t seen before: back end test generated fixtures for the front end HTTP integration points.&lt;/p&gt;
-
-&lt;h2&gt;The Problem&lt;/h2&gt;
-
-&lt;p&gt;Writing integration tests that test the entire application (consuming real HTTP end points and data) is tricky business. Keeping the entire codebase mounted and running in every environment can lead to slow test suites that sap away developer time between runs. There has to be an alternative to integration tests that are &amp;ldquo;just as good&amp;rdquo; and prevent bugs and regressions.&lt;/p&gt;
-
-&lt;p&gt;One alternative that seems obvious and supported by resources online is mocking HTTP interaction with fixture files. For instance, when the test suite requests &lt;code&gt;/users.json&lt;/code&gt;, return a pre-determined JSON blob that has the list of users. Ideally, this JSON reflects the current state of the back end API 100% of the time. What happens if this JSON no longer reflects the state of the back end? &lt;strong&gt;Bugs get introduced and users will be affected&lt;/strong&gt;. What happens when a developer wants to regenerate a fixture that was generated with data they don&amp;rsquo;t have? &lt;strong&gt;The developer will make concessions and introduce potential bugs.&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;I was thinking about how to solve this problem, always ensuring that the back end and front end are in sync. The solution should have these properties:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;Generate fixtures based on API end-points.&lt;/li&gt;
-&lt;li&gt;Be up to date 100% of the time, without developer thought.&lt;/li&gt;
-&lt;li&gt;Alert a back end developer when they are changing something that could affect the front end.&lt;/li&gt;
-&lt;li&gt;Reproducibility on all developer machines. If two developers run it independently, they get the same result.&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;h2&gt;Solution&lt;/h2&gt;
-
-&lt;p&gt;My solution involves capturing the HTTP response from test cases, and writing these out to disk in files that can be consumed by a front end test suite. The test cases themselves generate the fixtures, so the developer only has to run the back end suite before the front end suite when they make a change to ensure everything is up to date. One great property about test suites is that they involve consistent data setup across all developer machines, although they may involve random data which must be accounted for.&lt;/p&gt;
-
-&lt;p&gt;In RSpec/Rails, a developer can write the following spec which will generate the proper fixture:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="ruby"&gt;describe &amp;quot;GET index&amp;quot; do
-  it &amp;quot;is successful&amp;quot;, fixture: &amp;quot;widgets/index.json&amp;quot; do
-    get :index
-    expect(response).to be_success
-  end
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;The developer does not need to think about the fixture itself, only the particular test case they are looking to mock out. If the fixture changes between invocations, their test will fail and they will be aware that they might be introducing a bug. They can delete the file to regenerate it.&lt;/p&gt;
-
-&lt;p&gt;One caveat of this is that data can easily change between invocations of the test. For example, &lt;code&gt;*_id, created_at, updated_at&lt;/code&gt; are all fields that can change frequently. As a solution for this, I propose allowing for certain keys to be ignored (and implemented it out of the box in rspec-rcv gem).&lt;/p&gt;
-
-&lt;h2&gt;Gem&lt;/h2&gt;
-
-&lt;p&gt;I&amp;rsquo;ve put this together into a gem called rspec-rcv (reverse of VCR). If you have seen this testing paradigm before, let me know! I couldn&amp;rsquo;t find anything in my research and from discussing with experienced software engineers. Who knows, maybe it will help inspire a better name?&lt;/p&gt;
-
-&lt;p&gt;The gem is at &lt;a href="https://github.com/SalesLoft/rspec-rcv" target="_blank"&gt;https://github.com/SalesLoft/rspec-rcv&lt;/a&gt; and is available from download on &lt;a href="https://rubygems.org/gems/rspec-rcv" target="_blank"&gt;rubygems.org&lt;/a&gt;.&lt;/p&gt;
 </content>
   </entry>
 </feed>

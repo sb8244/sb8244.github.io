@@ -1,0 +1,259 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Designing Elixir Supervisor Trees</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>Designing Elixir Supervisor Trees</h1>
+      <p>Over the past year, I&rsquo;ve been getting more and more into Elixir. The language and
+paradigm has shifted how I think about coding in Ruby and has been incredibly <em>fun</em>
+to work with. One of the core concepts of an Elixir application is the supervision tree.
+Let&rsquo;s dive into some patterns that I typically use, along with some real code.</p>
+
+<h2>Supervisors and Processes</h2>
+
+<p>A process in Elixir is an isolated unit of execution. Processes have their own stack,
+&ldquo;run queue&rdquo;, and garbage collection. Because of this level of isolation, it helps to think
+of them as small programs that can talk to other small programs in an application. Processes
+are crucial for storing and accessing dynamic data, as well as for implementing transformations
+around data. A process executes all operations in its run queue sequentially, but multiple
+run queues can execute concurrently (leading to true concurrency). If you are curious about this
+specifically, I find
+Hamidreza Soleimani&rsquo;s <a href="https://hamidreza-s.github.io/erlang/scheduling/real-time/preemptive/migration/2016/02/09/erlang-scheduler-details.html" target="_blank">blog post</a>
+fascinating.</p>
+
+<p>A supervisor is a process that manages the lifecycles of child processes. This most often
+comes through as a fault tolerance mechanism. If a process crashes, the parent supervisor
+can choose to restart it, let it stay dead, restart it and all peers, etc. A supervisor
+can supervise other supervisors, which leads to a supervision tree.</p>
+
+<h2>Modeling a Problem</h2>
+
+<p>The problem that I&rsquo;m going to discuss today is the model of a game server for the game
+generals.io. This is a turn-based &ldquo;real-time&rdquo; strategy game that involves capturing towns
+with armies and overtaking the enemy generals. Users can queue up moves to execute sequentially
+over turns. This allows complex moves to be planned out and executed without losing time.</p>
+
+<p>In this problem, there are a few concepts that stick out to me:</p>
+
+<ul>
+<li>Board: A board is the representation of what the current state of the game is. This would
+include the cell types, the state of the armies, the fog of war, etc</li>
+<li>Command queue: This stores the entire set of commands for the game. It is write-ahead and
+knows what commands have been executed and which are in the future (and on which turn)</li>
+<li>Player list: Not as obvious as the others, but we need to know what players are in a game,
+and what the mapping is to their login</li>
+<li>Game: The game contains all of the above things and ticks every so often, progressing the
+gameplay along</li>
+<li>Game list: Building an online game requires supporting multiple games at once</li>
+</ul>
+
+<p>I&rsquo;m going to walk through each of these concepts (in order) and explain the approach I
+took in implementing the supervision tree. First, let&rsquo;s see what that supervision tree
+might look like.</p>
+
+<h2>Supervision Tree for Our Game</h2>
+
+<p>What I&rsquo;m about to present doesn&rsquo;t come immediately (well, maybe with more practice),
+and is something that came about through iterations and testing the waters with different
+code. This is the final product, which I&rsquo;ll go into more detail on. The [] syntax indicates
+what the children are.</p>
+
+<pre><code>Application -&gt; [GamesSupervisor, GameRegistry, WebEndpoint]
+GamesSupervisor (1 child type) -&gt; [GameSupervisor (dynamic)]
+GameSupervisor (4 child type) -&gt; [BoardServer, CommandQueueServer, TickServer, PlayerServer]
+</code></pre>
+
+<h2>BoardServer <a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/board_server.ex" target="_blank">[code]</a></h2>
+
+<p>When building the game, I started with the board object and naturally progressed into
+the BoardServer. I feel that starting on the inner nodes of the supervisor can make
+it more obvious what the next steps are, rather than trying to plan out everything
+at once.</p>
+
+<p>Notes on the code:</p>
+
+<p>I&rsquo;ve found myself trying to keep servers as simple as possible,
+and executing complex logic in plain old modules which don&rsquo;t have any GenServer
+capability. When looking at the BoardServer, I&rsquo;m happy to see that there is no
+real logic in it, other than turn + 1.</p>
+
+<p>Defining a simple interface is crucial for communication between GenServers. I&rsquo;ve
+found myself getting stuck in between more verbose interfaces in the past and always
+regret whatever brought me there.</p>
+
+<p>You&rsquo;ll notice that I don&rsquo;t use any of the GenServer helpers to remove boiler plate.
+I&rsquo;ve found that keeping it to pure Elixir makes it easier to read in the long run,
+and increases my consistency across projects.</p>
+
+<h2>CommandQueueServer <a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/command_queue_server.ex" target="_blank">[code]</a></h2>
+
+<p>Following the theme of keeping GenServers simple, this one is even more simple.
+When I&rsquo;m dealing with a GenServer that really only touches one thing, like this one
+dealing with a Queue implementation, I do like to reach for Agent. Using an Agent
+removes the need to build a real GenServer implementation, and increases the
+readability significantly.</p>
+
+<p>I don&rsquo;t find myself reaching for an Agent often, and will pull it out to a regular
+GenServer if it gets too complex.</p>
+
+<h2>PlayerServer <a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/player_server.ex" target="_blank">[code]</a></h2>
+
+<p>This is another simple Agent implementation that I feel like got a little bit sloppy.
+This is due to the use of a Map rather than a custom data structure. To clean up
+this code, I would look at extracting the Map behavior into a specific PlayerList
+module.</p>
+
+<h2>TickServer <a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/tick_server.ex" target="_blank">[code]</a></h2>
+
+<p>I love this TickServer. One of my favorite lines of code in Elixir has been:</p>
+
+<pre><code>Process.send_after(self(), :start_tick, timeout)
+</code></pre>
+
+<p>This code is going to send a message from one process to itself, but set for the future.
+This allows creation of non-blocking (while the waiting is happening) GenServer implementations
+that are implemented entirely using native Elixir concepts.</p>
+
+<p>Another interesting point here is that the TickServer accepts a <code>ticker_fn</code> in the server
+initialization. We&rsquo;ll see this pop up in our GameServer later. I thought this technique was
+really interesting (and was sort of surprised it worked). It works due to the fact that
+a fn in Elixir can be passed around like any other variable, and Elixir is stateless which
+means that the fn doesn&rsquo;t get any context from where it is defined. Be warned, however, that
+executing a fn in the TickServer is going to block the TickServer until that function
+completes; it is not going to execute in the server that defined the fn.</p>
+
+<h2>GameSupervisor <a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/game_supervisor.ex" target="_blank">[code]</a></h2>
+
+<p>There&rsquo;s a lot going on in this supervisor, so let&rsquo;s take it slow and just look at a few
+specific concepts.</p>
+
+<p>The first thing to point out is the use of Registry:</p>
+
+<pre><code>def start_link(opts = %{game_id: id}) do
+  Supervisor.start_link(__MODULE__, opts, name: {:via, Registry, {get_registry_name(), id}})
+end
+</code></pre>
+
+<p>Using the Registry allows for a named dynamic lookup / uniqueness of a GenServer. The
+supervisor is defined by the id passed in, which would prevent two games from ever sharing
+the same id at the same time. As you can imagine, that would be bad. We can take advantage
+of the uniqueness as well, because another GenServer that is started with this id will return
+the pid in the start_link call. We&rsquo;ll see this through in the GamesSupervisor below.</p>
+
+<p>Another useful code snippet is for looking up a process by type under a supervisor:</p>
+
+<pre><code>defp find_child_type(sup_pid, type) do
+  Enum.find(Supervisor.which_children(sup_pid), {nil, nil, nil, nil}, fn({mod, _pid, _type, _}) -&gt;
+    mod == type
+  end) |&gt; elem(1)
+end
+</code></pre>
+
+<p>I&rsquo;ve begun putting this in a Utils namespace in my new projects, but the gist is simple.
+By using the supervisor&rsquo;s pid, we can list out all of its children and find the one
+with a given type (or base it on other things). GameSupervisor only has 1 child of
+each type, which makes this work well.</p>
+
+<p>Our trust <a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/game_supervisor.ex#L76" target="_blank">ticker_fn</a> is
+defined in this GameSupervisor. The reason I took this approach is that the knowledge of how to tick
+should belong to something separate from what the ticking behavior is. Looking at this now,
+I would probably pull this code into another module since it&rsquo;s so long.</p>
+
+<h2>GamesSupervisor <a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/games_supervisor.ex" target="_blank">[code]</a></h2>
+
+<p>We&rsquo;ve finally made it to the top of the supervision tree with the GamesSupervisor. This
+supervisor takes advantage of the GameRegistry to provide game lookups:</p>
+
+<pre><code>def get_game(id, opts \\ []) do
+  options = Keyword.merge([name: __MODULE__], opts)
+  Supervisor.start_child(options[:name], [%{game_id: id}]) |&gt; case do
+    {:error, {:already_started, pid}} -&gt; pid
+    {:error, _} -&gt; nil
+  end
+end
+</code></pre>
+
+<p>In this case, the GameSupervisor is identified by the id, which will return when
+<code>{:error, {:already_started, pid}}</code> is returned from the start_child call. I use
+this pattern in nearly every dynamic supervisor that I&rsquo;ve written. I do typically
+implement start/get in the same method (starting if it doesn&rsquo;t exist, getting if it does),
+but I found that to not work well as creating a new game involves several complex
+operations such as board generation.</p>
+
+<h2>Registry</h2>
+
+<p>If you use a Registry, you do need to start it as a process in your application. I
+generally just include it at the top level of my
+<a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/application.ex#L9" target="_blank">Application module</a>.</p>
+
+<h2>Final Thoughts</h2>
+
+<p>One good sign that your supervision tree has come together well is a very simple
+mounting of it onto your final Application. Writing <code>supervisor(Generals.GamesSupervisor, [])</code>
+seems like a very clean interface for interacting with my game supervision tree, and
+I feel good about that.</p>
+
+<p>Another key thing to think of when writing your supervision tree is what can / will
+execute concurrently. For instance, let&rsquo;s say that your PlayerList is implemented in
+the same GenServer as the Board. If you want to access the PlayerList to see who is
+in a game, it would not be able to run concurrently with Board operations. By splitting
+them up into separate GenServer implementations, they can execute concurrently (keep in
+mind that Elixir automatically distributes across cores).</p>
+
+<p>I hope this helped or solidified GenServer concepts for you. Please feel free to reach out
+with any cool tips or tricks.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
