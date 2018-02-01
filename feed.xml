@@ -4,16 +4,113 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-01-07T21:47:00-05:00</updated>
+  <updated>2018-02-01T01:30:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 days of Elixir - Development Environment</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/01/28-days-of-elixir-development-environment.html"/>
+    <id>https://stephenbussey.com/2018/02/01/28-days-of-elixir-development-environment.html</id>
+    <published>2018-02-01T01:30:00-05:00</published>
+    <updated>2018-02-01T01:55:41-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;Welcome to day 1 of (hopefully) 28 days of Elixir! I&amp;rsquo;ve set a goal to write a technical blog
+post every single day this month, and I&amp;rsquo;m really excited about Elixir right now. I don&amp;rsquo;t know
+what the entire series will bring, but I do know that I&amp;rsquo;ll basically have to be putting all of my
+thoughts and experiences about Elixir out there over the next month.&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;m going to start this series off with something light: development environments. Specifically,
+the one that I use and things that I&amp;rsquo;ve found enjoyable coming from another language like Ruby
+or Javascript. I don&amp;rsquo;t intend to convince anyone of anything on this (especially with regards
+to editors), but I do think there&amp;rsquo;s some interesting things about Elixir specifically that
+can apply to every environment. Let&amp;rsquo;s jump in.&lt;/p&gt;
+
+&lt;h2&gt;Elixir Installation&lt;/h2&gt;
+
+&lt;p&gt;I use &lt;a href="https://github.com/taylor/kiex" target="_blank"&gt;kiex&lt;/a&gt; to manage my elixir versions
+and &lt;a href="https://github.com/kerl/kerl" target="_blank"&gt;kerl&lt;/a&gt; to manage my erlang/OTP versions. kiex has
+been great, it&amp;rsquo;s really easy to use! I have to say that I&amp;rsquo;m genuinely impressed with
+how little speed bumps I&amp;rsquo;ve encountered over time. I do recommend using some sort of
+version manager rather than brew, because there will definitely be more than one project
+in Elixir over time!&lt;/p&gt;
+
+&lt;p&gt;kerl on the other hand, has generally been fairly painful to use. I think the biggest
+thing here is that Elixir versions need recompiled once OTP is changed. I could be
+wrong here because I haven&amp;rsquo;t had to do it too often, but I do distinctly remember
+significant pain from the OTP 20 upgrade. This happens very infrequently though.&lt;/p&gt;
+
+&lt;p&gt;One thing that I wish kiex had was the concept of a .elixir-version file like rbenv. It
+has to be done manually right now, which is error prone on a team.&lt;/p&gt;
+
+&lt;h2&gt;My Editor&lt;/h2&gt;
+
+&lt;p&gt;Although I&amp;rsquo;ve tried to get into other editors over time, I have found myself drawn again
+and again to the simplicity and flexibility of atom, so that&amp;rsquo;s what I&amp;rsquo;ve been using lately.
+There are 3 packages that I use specifically for atom that are, I think, absolute
+must haves: atom-elixir, language-elixir, elixir-jump-around.&lt;/p&gt;
+
+&lt;p&gt;atom-elixir and language-elixir provide the base for the actual act of authoring code.
+The auto-complete functionality works generally well, although there are some core quirks.
+Due to how Elixir compilation works, tools like atom-elixir look into the actual _build
+output of the code to produce auto-complete and documentation services. This is really interesting
+to me, because it means that &lt;em&gt;any&lt;/em&gt; editor should be able to accomplish that same task. Whether
+emacs, vim, vscode, whatever is being used, it should be completely achievable to have full
+auto-complete and documentation capabilities.&lt;/p&gt;
+
+&lt;p&gt;In addition to great auto-complete capabilities, atom-elixir has a really good &amp;ldquo;go to definition&amp;rdquo;
+functionality. When I am authoring Ruby code, I find that only Rubymine has been able to
+achieve true definition jumping. ctags can provide some of it, but jumping into installed
+libraries is very useful for debugging problems or understanding how a method works. For example,
+do you want to know how an Enum method is implemented? Just alt+click and you&amp;rsquo;re there! Elixir&amp;rsquo;s
+compilation design makes this all possible in any editor, not just a Jetbrains editor. Check
+it out!&lt;/p&gt;
+
+&lt;p&gt;Lastly, &amp;ldquo;jump to test&amp;rdquo; is so useful for me. My typical flow for creating a file has become:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Create the module in my lib folder somewhere&lt;/li&gt;
+&lt;li&gt;Press opt-g-t to jump to the non-existent file&lt;/li&gt;
+&lt;li&gt;Copy the module definition, add Test to it, then save the file&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;I&amp;rsquo;m able to do this entire flow very quickly and without navigating a file tree.&lt;/p&gt;
+
+&lt;h2&gt;Docker vs Native Execution&lt;/h2&gt;
+
+&lt;p&gt;Some people really like to develop software on the OS that is going to run it in production,
+and more power to them! However, I&amp;rsquo;ve found myself drawn to having software that is runnable
+on my macbook, natively, rather than using a tool like Docker or Vagrant. However, I do utilize
+Docker for CI and production build processes.&lt;/p&gt;
+
+&lt;h2&gt;Mix Format&lt;/h2&gt;
+
+&lt;p&gt;I&amp;rsquo;ve begrudgingly accepted the mix formatter over the past few weeks. I find that I often
+have issues with getting a file to format in certain situations. This seems like a bug in the formatter,
+though. The format itself is generally agreeable but sometimes is not and there is no
+customization route. I think that it&amp;rsquo;s better to accept a standard, even if it&amp;rsquo;s not
+my desired standard, if it improves the community and team at large.&lt;/p&gt;
+
+&lt;p&gt;I run this manually as I go. Now that I think about it more, I should probably have this setup
+in some semi-automated fashion until it becomes too slow.&lt;/p&gt;
+
+&lt;h2&gt;Wrapping up&lt;/h2&gt;
+
+&lt;p&gt;That ended up being longer than I anticipated, but I&amp;rsquo;m still sure there are many things
+I didn&amp;rsquo;t cover. Feel free to reach out if you have any question about how my setup
+works or if you have awesome tools that you can&amp;rsquo;t live without!&lt;/p&gt;
+
+&lt;p&gt;See ya tomorrow hopefully! It is only day 1, so we&amp;rsquo;ll have to see how it goes.&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>Designing Elixir Supervisor Trees</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/01/08/designing-elixir-supervisor-trees.html"/>
     <id>https://stephenbussey.com/2018/01/08/designing-elixir-supervisor-trees.html</id>
     <published>2018-01-07T21:47:00-05:00</published>
-    <updated>2018-01-07T22:38:03-05:00</updated>
+    <updated>2018-02-01T01:56:07-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -653,71 +750,6 @@ cropped_image = Magick::Image.read(image)[0].crop(
 &lt;/blockquote&gt;
 
 &lt;p&gt;&lt;em&gt;I&amp;rsquo;ve already said this, but it&amp;rsquo;s worth a final note.&lt;/em&gt; Being exceptional is a choice that can be made. It isn&amp;rsquo;t instant and requires hard work and motivation, but it is possible. Starting each day with the &lt;a href="https://en.wikipedia.org/wiki/Intentional_living" target="_blank"&gt;intention&lt;/a&gt; to be exceptional will eventually pay off.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Identifying and Fixing Web Application Performance Problems</title>
-    <link rel="alternate" href="https://stephenbussey.com/2015/11/10/performance-fixes.html"/>
-    <id>https://stephenbussey.com/2015/11/10/performance-fixes.html</id>
-    <published>2015-11-09T19:00:00-05:00</published>
-    <updated>2017-09-29T15:19:43-04:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;Identifying performance problems; it is a daunting task given to many software engineers who are working on scaling up applications. As requests increase in frequency from hundreds, thousands, tens of thousands per minute, being able to locate performance bottle necks and then fix them in crucial for long-term success. While not every application will scale in the same way, I&amp;rsquo;ve thought about tips that will hopefully help many engineers facing the same problems that I am facing.&lt;/p&gt;
-
-&lt;h2&gt;Locating the Areas to Improve&lt;/h2&gt;
-
-&lt;p&gt;An application has hundreds of endpoints and a ton of code, how can one possibly know where to start looking for performance gains? Through tools like New Relic, I can identify low performers to the Apdex and average request time.&lt;/p&gt;
-
-&lt;p&gt;My favorite view in New Relic is the &amp;ldquo;Apdex most dissatisfying&amp;rdquo; view under transactions. Through this view, I am able to see requests which most disatisfy the user base. However, I  focus on transactions with moderate to high throughput to see the most gain. We&amp;rsquo;ve recently lowered our t-threshold from 0.50 (default) to 0.04 (aggressive). By doing this, we have set a high performance bar that allows for better feedback through the apdex.&lt;/p&gt;
-
-&lt;p&gt;Another great view is the simple &amp;ldquo;databases&amp;rdquo; tab. By knowing the load on the database, and equating that to usage, I can understand which transactions are heavy hitters, and how their throughput affects the database. Also, if memcache or redis usage is ballooning, it is an indicator that there may be caching in an incorrect place.&lt;/p&gt;
-
-&lt;p&gt;After identifying transactions that are candidates for improvement, I follow a few sets of rules, and then explore fringe cases that don&amp;rsquo;t fall into them on a case-by-case basis.&lt;/p&gt;
-
-&lt;h2&gt;Assume it is the Database&lt;/h2&gt;
-
-&lt;p&gt;Databases do a ton of work, and there is a good chance that applications are using them in a way that reduces their maximum throughput. Although there are many types of database issues, two that are most seen by me are &lt;strong&gt;n+1 queries&lt;/strong&gt; and &lt;strong&gt;missing indices&lt;/strong&gt;.&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;n+1 queries&lt;/strong&gt; are pesky occurences where an application is requesting information from the database in an iteration that could have been loaded by the database in a single query outside of the iteration. This topic has been hit pretty heavily, but one new contribution I can add is that a query doesn&amp;rsquo;t have to hit the database to be a performance deficit. In Rails, the active record cache can save a database call at the expense of fully loading Arel objects. I use Rails panel to identify &amp;ldquo;cached queries&amp;rdquo; and try to remove them in as many cases as possible. I&amp;rsquo;ve seen performance gains as drastic as 10+ seconds just from cached queries that don&amp;rsquo;t even hit the database.&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;Missing indices&lt;/strong&gt; is a very common database issue that is exactly as it sounds. Outside of the usual index suspects, Postgres offers partial index which can be a huge performance gain in certain situations. Take for instance this edited filtered scan explanation:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;Limit  (cost=0.00..88.80 rows=1 width=493) (actual time=0.387..0.387 rows=0 loops=1)
-Index Scan using index_name on my_table  (cost=0.56..12.60 rows=1 width=430) (actual time=0.106..0.106 rows=1 loops=1)
-         Index Cond: (some_text_field = &amp;#39;some value&amp;#39;::text)
-         Filter: (team_id = 1 AND NOT deleted)
-        Rows Removed by Filter: 1720
-Total runtime: 0.406 ms
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;It is good that this is hitting an index, but do you notice the filter conditional on a constant value? By taking advantage of a partial index &lt;code&gt;WHERE NOT deleted&lt;/code&gt;, huge performance gains can be realized:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;Limit  (cost=0.28..8.30 rows=1 width=493) (actual time=0.038..0.038 rows=0 loops=1)
-  -&amp;gt;  Index Scan using index_name on my_table  (cost=0.28..8.30 rows=1 width=493) (actual time=0.038..0.038 rows=0 loops=1)
-        Index Cond: (some_text_field = &amp;#39;some value&amp;#39;::text)
-        Filter: (team_id = 1)
-Total runtime: 0.065 ms
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;There are tons of small tricks like this that are picked up through interacting with &lt;code&gt;EXPLAIN ANALYZE&lt;/code&gt;. I encourage people looking to learn to dig into troublesome queries and really taking the time to understand the debug output. I&amp;rsquo;ve found some queries that can go from 15s down to .01ms just from partial indices.&lt;/p&gt;
-
-&lt;h2&gt;Look for Sequences of Code to Memoize&lt;/h2&gt;
-
-&lt;p&gt;Memoization is a hot topic in the Ruby world. I personally reach for &lt;code&gt;@method_name ||= the content&lt;/code&gt; and stick to one line methods whenever possible. However, it is possible to cache &lt;code&gt;begin ; end&lt;/code&gt; and &lt;code&gt;if&lt;/code&gt; statements in Ruby.&lt;/p&gt;
-
-&lt;p&gt;When a request is being executed, most memory is going to be specific for that request. A decision can be made of &amp;ldquo;if this count is 1 at the beginning of the request and 2 at the end, does that matter?&amp;rdquo;. If the answer is no (it usually is), then one can memoize the count method to store the result in memory. This is how n+1 queries can be removed.&lt;/p&gt;
-
-&lt;h2&gt;Discover the Context of Code&lt;/h2&gt;
-
-&lt;p&gt;A continuation of memoization is truly understanding the context that code will be executing in. In order to make decisions like memoization, one must be cognizant of the usage of that code elsewhere in the codebase. For instance, will the method be used in the foreground, background, once a second, 100 times per second, etc. Code has to work and be performant in all contexts, and the only way to do this is fully understand it. It is the job of a software engineer to discover this context.&lt;/p&gt;
-
-&lt;p&gt;One example of how drastic context can be is a class which caches a value in memcache (off box). If the code is executing in a background job 1 at a time, then the cache is necessary to prevent recalculation between runs. However, if the code is executing inside of an iteration of a single run, then cache could be avoided in exchange for memory. Finding instances where application code can be moved from off-box to in-memory will speed it up significantly.&lt;/p&gt;
-
-&lt;h2&gt;Conclusion&lt;/h2&gt;
-
-&lt;p&gt;I don&amp;rsquo;t usually end my posts with conclusions, but it is important to re-iterate that performance optimization is an open book where one solution won&amp;rsquo;t be the end all. I&amp;rsquo;ve learned something new almost every time I&amp;rsquo;ve went in for speed improvements, and I come out happy every single time. Give it a shot and let me know if you find any cool techniques!&lt;/p&gt;
 </content>
   </entry>
 </feed>

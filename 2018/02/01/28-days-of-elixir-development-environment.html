@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 days of Elixir - Development Environment</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 days of Elixir - Development Environment</h1>
+      <p>Welcome to day 1 of (hopefully) 28 days of Elixir! I&rsquo;ve set a goal to write a technical blog
+post every single day this month, and I&rsquo;m really excited about Elixir right now. I don&rsquo;t know
+what the entire series will bring, but I do know that I&rsquo;ll basically have to be putting all of my
+thoughts and experiences about Elixir out there over the next month.</p>
+
+<p>I&rsquo;m going to start this series off with something light: development environments. Specifically,
+the one that I use and things that I&rsquo;ve found enjoyable coming from another language like Ruby
+or Javascript. I don&rsquo;t intend to convince anyone of anything on this (especially with regards
+to editors), but I do think there&rsquo;s some interesting things about Elixir specifically that
+can apply to every environment. Let&rsquo;s jump in.</p>
+
+<h2>Elixir Installation</h2>
+
+<p>I use <a href="https://github.com/taylor/kiex" target="_blank">kiex</a> to manage my elixir versions
+and <a href="https://github.com/kerl/kerl" target="_blank">kerl</a> to manage my erlang/OTP versions. kiex has
+been great, it&rsquo;s really easy to use! I have to say that I&rsquo;m genuinely impressed with
+how little speed bumps I&rsquo;ve encountered over time. I do recommend using some sort of
+version manager rather than brew, because there will definitely be more than one project
+in Elixir over time!</p>
+
+<p>kerl on the other hand, has generally been fairly painful to use. I think the biggest
+thing here is that Elixir versions need recompiled once OTP is changed. I could be
+wrong here because I haven&rsquo;t had to do it too often, but I do distinctly remember
+significant pain from the OTP 20 upgrade. This happens very infrequently though.</p>
+
+<p>One thing that I wish kiex had was the concept of a .elixir-version file like rbenv. It
+has to be done manually right now, which is error prone on a team.</p>
+
+<h2>My Editor</h2>
+
+<p>Although I&rsquo;ve tried to get into other editors over time, I have found myself drawn again
+and again to the simplicity and flexibility of atom, so that&rsquo;s what I&rsquo;ve been using lately.
+There are 3 packages that I use specifically for atom that are, I think, absolute
+must haves: atom-elixir, language-elixir, elixir-jump-around.</p>
+
+<p>atom-elixir and language-elixir provide the base for the actual act of authoring code.
+The auto-complete functionality works generally well, although there are some core quirks.
+Due to how Elixir compilation works, tools like atom-elixir look into the actual _build
+output of the code to produce auto-complete and documentation services. This is really interesting
+to me, because it means that <em>any</em> editor should be able to accomplish that same task. Whether
+emacs, vim, vscode, whatever is being used, it should be completely achievable to have full
+auto-complete and documentation capabilities.</p>
+
+<p>In addition to great auto-complete capabilities, atom-elixir has a really good &ldquo;go to definition&rdquo;
+functionality. When I am authoring Ruby code, I find that only Rubymine has been able to
+achieve true definition jumping. ctags can provide some of it, but jumping into installed
+libraries is very useful for debugging problems or understanding how a method works. For example,
+do you want to know how an Enum method is implemented? Just alt+click and you&rsquo;re there! Elixir&rsquo;s
+compilation design makes this all possible in any editor, not just a Jetbrains editor. Check
+it out!</p>
+
+<p>Lastly, &ldquo;jump to test&rdquo; is so useful for me. My typical flow for creating a file has become:</p>
+
+<ol>
+<li>Create the module in my lib folder somewhere</li>
+<li>Press opt-g-t to jump to the non-existent file</li>
+<li>Copy the module definition, add Test to it, then save the file</li>
+</ol>
+
+<p>I&rsquo;m able to do this entire flow very quickly and without navigating a file tree.</p>
+
+<h2>Docker vs Native Execution</h2>
+
+<p>Some people really like to develop software on the OS that is going to run it in production,
+and more power to them! However, I&rsquo;ve found myself drawn to having software that is runnable
+on my macbook, natively, rather than using a tool like Docker or Vagrant. However, I do utilize
+Docker for CI and production build processes.</p>
+
+<h2>Mix Format</h2>
+
+<p>I&rsquo;ve begrudgingly accepted the mix formatter over the past few weeks. I find that I often
+have issues with getting a file to format in certain situations. This seems like a bug in the formatter,
+though. The format itself is generally agreeable but sometimes is not and there is no
+customization route. I think that it&rsquo;s better to accept a standard, even if it&rsquo;s not
+my desired standard, if it improves the community and team at large.</p>
+
+<p>I run this manually as I go. Now that I think about it more, I should probably have this setup
+in some semi-automated fashion until it becomes too slow.</p>
+
+<h2>Wrapping up</h2>
+
+<p>That ended up being longer than I anticipated, but I&rsquo;m still sure there are many things
+I didn&rsquo;t cover. Feel free to reach out if you have any question about how my setup
+works or if you have awesome tools that you can&rsquo;t live without!</p>
+
+<p>See ya tomorrow hopefully! It is only day 1, so we&rsquo;ll have to see how it goes.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
