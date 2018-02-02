@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 days of Elixir - Silly Mistakes I Make Again and Again</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 days of Elixir - Silly Mistakes I Make Again and Again</h1>
+      <p>It&rsquo;s day 2 of my 28 days of Elixir blogging. I have 5 more ideas in the funnel, and I fear
+that coming up with 28 interesting topics will be hard. I&rsquo;ll definitely be leaning on
+co-workers for ideas, but don&rsquo;t hesitate to reach out if you have any interesting ideas
+that you&rsquo;d want me to explore!</p>
+
+<p>I&rsquo;ve been writing Elixir daily at SalesLoft, and have gotten pretty quick with development
+and testing of my apps. However, a few things just keep catching me up every time:</p>
+
+<h2>Charlist and Strings</h2>
+
+<p>In both Ruby and Javascript, it is acceptable to swap &lsquo; and &ldquo;  for strings, in many cases.
+This means that &#39;a&rsquo; === &quot;a&rdquo; in Javascript. However, &lsquo;a&rsquo; != &ldquo;a&rdquo; in Elixir. This is due to
+charlist and string being implemented differently. Charlist is often used for interfacing
+with erlang directly, because erlang does not have the concept of &ldquo;strings&rdquo;.</p>
+
+<p>One mistake I will often catch is swapping the usage of the quote constructs and then
+doing equality or other comparisons, and being bewildered when the strings do not match.
+Catching this error can be a bit tricky if the error message doesn&rsquo;t show you that the
+types are different, but a usual symptom is being completely bewildered why two matching
+strings are not matching. The most significant place to pay attention to is when interfacing
+with code between libraries, as the target and source are separated.</p>
+
+<h2>Running mix test on the source file</h2>
+
+<p>This one is always a face-palmer. When running <code>mix test test/my_test.exs</code>, be careful of
+accidentally copying a path like <code>mix test lib/my.ex</code>. The symptom of this mistake is a
+passing spec suite which runs 0 specs, and complains about a re-defined module.</p>
+
+<h2>Define a test file with the same name as the real module, rather than test</h2>
+
+<p>My flow for creating a module is to create the source module (.ex), then running
+(opt-g-t) to create a test script (.exs). I will then copy the source module definition
+and add ExUnit and <code>Test</code> to the end of the module.</p>
+
+<p>As I&rsquo;m going red/green on my code, I sometimes find myself shocked that a function
+doesn&rsquo;t exist when I most certainly just defined it. After looking around wondering
+what is going on, I realize I forgot to include <code>Test</code> at the end of the module. This
+re-initializes the module (without real code) but is still a sementically valid
+test file.</p>
+
+<h2>Not recognizing pattern matching in test helpers such as assert received</h2>
+
+<p>This is one of the more interesting / subtle mistakes that I find myself making. I especially
+see this in older Elixir code that I wrote where I didn&rsquo;t fully understand what was
+going on.</p>
+
+<p>I will be doing a task like writing / testing a websocket channel and find that my
+code passes perfectly when I know that it&rsquo;s definitely not working correctly. I will
+be trying to make my code go red but simply can&rsquo;t make it. Usually, it turns out
+that I&rsquo;m using a function like <a href="https://hexdocs.pm/phoenix/Phoenix.ChannelTest.html#assert_push/3" target="_blank">assert_push/3</a>
+that is actually a macro. The way these are written, the function is actually
+doing pattern matching rather than exact checks. For instance:</p>
+
+<pre><code>expected_payload = %{foo: &quot;bar&quot;}
+assert_push &quot;some_event&quot;, expected_payload
+</code></pre>
+
+<p>is different than:</p>
+
+<pre><code>expected_payload = %{foo: &quot;bar&quot;}
+assert_push &quot;some_event&quot;, ^expected_payload
+</code></pre>
+
+<p>This is highlighted in the assert_push documentation, but essentially the first example
+doesn&rsquo;t check that the payload is <em>exactly</em> the expected payload. This means that there could
+be something like a data leak and our test wouldn&rsquo;t catch it! Pattern matching the responses
+can be super useful, but make sure that it&rsquo;s happening when you expect it, and not
+when you don&rsquo;t!</p>
+
+<p>Thanks for reading, today. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
