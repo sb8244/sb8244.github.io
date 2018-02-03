@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 Days - Bringing Elixir to Others - New Language vs. New Paradigm</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 Days - Bringing Elixir to Others - New Language vs. New Paradigm</h1>
+      <p>I&rsquo;ll be giving a talk next week about taking Elixir into production. While there are
+technical challenges to doing so, I must also consider the human-based challenges that will be faced. For
+example, most team members will be learning a new language when they are introduced to Elixir.
+If they have been doing object-oriented coding, will a functional coding paradigm get them stuck?
+Will OTP and the paradigm of a process based application cause confusion?</p>
+
+<p>I won&rsquo;t necessarily present answers to some of these questions today, but rather bring up
+questions that I&rsquo;ve heard and alternative ways of thinking about the answers.</p>
+
+<h2>Functional Programming and Elixir Itself</h2>
+
+<p>Before all of the fun and excitement of making a real Elixir application comes the challenge of
+learning the Elixir language. Most people that ask me about learning Elixir focus on what
+types of courses they can pay for online to get into the language. While I&rsquo;m sure that some
+people are going to benefit from these courses enormously, it&rsquo;s never the first place I&rsquo;d send
+someone. Instead, I recommend the <a href="https://elixir-lang.org/getting-started/introduction.html" target="_blank">Elixir Getting Started Guide</a>.
+This guide is put together by the official Elixir team and covers an introduction to the language itself.</p>
+
+<p>As other members of the organization dive into the concepts of Elixir, questions will
+be raised about what functional programming is, what does immutability mean, and what is &ldquo;all of this&rdquo; in practice?
+Even further questioning might ask &ldquo;what makes the functional paradigm good?&rdquo; Other team members will rely
+on the Elixir champion to answer these questions, so be prepared for them to pop up once people start learning.
+I read something in a reddit comment today that I really liked on this topic: the value of the data
+doesn&rsquo;t change in Elixir, but rather the variables point to new pieces of data. I thought that was a
+very straight-forward way of looking at the functional programming model that Elixir brings.</p>
+
+<p><em>I prep anyone that is going through the getting started guide that it will take probably 2-4 times
+to really understand Elixir to the point of being comfortable when reading other people&rsquo;s code. Having
+a real world project to read and play around with can lower this learning curve.</em></p>
+
+<h2>OTP</h2>
+
+<p>OTP is a cornerstone of writing Elixir applications. There&rsquo;s lot of things about the topic already, but
+I had an interesting observation the other day about OTP and how it relates to bringing Elixir to the
+rest of an organization:</p>
+
+<p><strong>The majority of business applications could be built with all OTP hidden away by libraries, to the point
+of developers not needing to know the details of OTP.</strong></p>
+
+<p>While I think that using OTP can help bring about advantages in an application, especially in a distributed
+environment, it is not really necessary. For example, a developer could start a new application today and
+serve the HTTP layer with Phoenix. They could then spin up a queue system like ExQ in order to process
+background jobs. Finally, they can connect websockets for read/write access to the API. All of this can happen
+without ever typing <code>GenServer</code> in code and create an application which satisfies the business.</p>
+
+<p>This isn&rsquo;t necessarily best practice, but I believe that it&rsquo;s okay to sometimes put aside best practice
+in order to achieve an initial velocity. Once the team is rolling, the OTP concepts will come out of the
+woodwork and start to make sense, hopefully faster than they would in isolation.</p>
+
+<hr>
+
+<p>Regardless of how you approach bringing Elixir to the people on your team, realize that you must be a
+champion for the education and empowerment of the team. Look for interesting ways to answer questions that
+people have and remove the roadblocks that pop-up as quick as you can.</p>
+
+<p>Thanks for reading the third post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>

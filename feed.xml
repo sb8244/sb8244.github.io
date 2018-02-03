@@ -4,10 +4,78 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-02T01:30:00-05:00</updated>
+  <updated>2018-02-03T14:46:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 Days - Bringing Elixir to Others - New Language vs. New Paradigm</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/03/bringing-elixir-to-others-new-language-vs-new-paradigm.html"/>
+    <id>https://stephenbussey.com/2018/02/03/bringing-elixir-to-others-new-language-vs-new-paradigm.html</id>
+    <published>2018-02-03T14:46:00-05:00</published>
+    <updated>2018-02-03T15:10:05-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I&amp;rsquo;ll be giving a talk next week about taking Elixir into production. While there are
+technical challenges to doing so, I must also consider the human-based challenges that will be faced. For
+example, most team members will be learning a new language when they are introduced to Elixir.
+If they have been doing object-oriented coding, will a functional coding paradigm get them stuck?
+Will OTP and the paradigm of a process based application cause confusion?&lt;/p&gt;
+
+&lt;p&gt;I won&amp;rsquo;t necessarily present answers to some of these questions today, but rather bring up
+questions that I&amp;rsquo;ve heard and alternative ways of thinking about the answers.&lt;/p&gt;
+
+&lt;h2&gt;Functional Programming and Elixir Itself&lt;/h2&gt;
+
+&lt;p&gt;Before all of the fun and excitement of making a real Elixir application comes the challenge of
+learning the Elixir language. Most people that ask me about learning Elixir focus on what
+types of courses they can pay for online to get into the language. While I&amp;rsquo;m sure that some
+people are going to benefit from these courses enormously, it&amp;rsquo;s never the first place I&amp;rsquo;d send
+someone. Instead, I recommend the &lt;a href="https://elixir-lang.org/getting-started/introduction.html" target="_blank"&gt;Elixir Getting Started Guide&lt;/a&gt;.
+This guide is put together by the official Elixir team and covers an introduction to the language itself.&lt;/p&gt;
+
+&lt;p&gt;As other members of the organization dive into the concepts of Elixir, questions will
+be raised about what functional programming is, what does immutability mean, and what is &amp;ldquo;all of this&amp;rdquo; in practice?
+Even further questioning might ask &amp;ldquo;what makes the functional paradigm good?&amp;rdquo; Other team members will rely
+on the Elixir champion to answer these questions, so be prepared for them to pop up once people start learning.
+I read something in a reddit comment today that I really liked on this topic: the value of the data
+doesn&amp;rsquo;t change in Elixir, but rather the variables point to new pieces of data. I thought that was a
+very straight-forward way of looking at the functional programming model that Elixir brings.&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;I prep anyone that is going through the getting started guide that it will take probably 2-4 times
+to really understand Elixir to the point of being comfortable when reading other people&amp;rsquo;s code. Having
+a real world project to read and play around with can lower this learning curve.&lt;/em&gt;&lt;/p&gt;
+
+&lt;h2&gt;OTP&lt;/h2&gt;
+
+&lt;p&gt;OTP is a cornerstone of writing Elixir applications. There&amp;rsquo;s lot of things about the topic already, but
+I had an interesting observation the other day about OTP and how it relates to bringing Elixir to the
+rest of an organization:&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;The majority of business applications could be built with all OTP hidden away by libraries, to the point
+of developers not needing to know the details of OTP.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;While I think that using OTP can help bring about advantages in an application, especially in a distributed
+environment, it is not really necessary. For example, a developer could start a new application today and
+serve the HTTP layer with Phoenix. They could then spin up a queue system like ExQ in order to process
+background jobs. Finally, they can connect websockets for read/write access to the API. All of this can happen
+without ever typing &lt;code&gt;GenServer&lt;/code&gt; in code and create an application which satisfies the business.&lt;/p&gt;
+
+&lt;p&gt;This isn&amp;rsquo;t necessarily best practice, but I believe that it&amp;rsquo;s okay to sometimes put aside best practice
+in order to achieve an initial velocity. Once the team is rolling, the OTP concepts will come out of the
+woodwork and start to make sense, hopefully faster than they would in isolation.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;Regardless of how you approach bringing Elixir to the people on your team, realize that you must be a
+champion for the education and empowerment of the team. Look for interesting ways to answer questions that
+people have and remove the roadblocks that pop-up as quick as you can.&lt;/p&gt;
+
+&lt;p&gt;Thanks for reading the third post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;.&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 days of Elixir - Silly Mistakes I Make Again and Again</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/02/28-days-of-elixir-silly-mistakes-i-make-again-and-again.html"/>
@@ -714,82 +782,6 @@ time spent on each request.&lt;/p&gt;
 
 &lt;p&gt;I hope that these tips help you out with your Twilio implementation. You&amp;rsquo;re sure to learn more as you deploy your first application,
 or scale an existing application, but the growing pains will be well worth it in the end.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Visual Regression Testing in Capybara</title>
-    <link rel="alternate" href="https://stephenbussey.com/2016/05/07/visual-regression-testing.html"/>
-    <id>https://stephenbussey.com/2016/05/07/visual-regression-testing.html</id>
-    <published>2016-05-06T20:00:00-04:00</published>
-    <updated>2017-09-29T15:19:43-04:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;An interesting topic that is picking up traction with many front-end UI engineers is visual regression testing. Visual regression testing relies on known visual state, which enforces that the application has not visually changed between code changes. Our QA and UI engineering team at SalesLoft recently began to discuss their desire to try this out; I want to share our first iteration.&lt;/p&gt;
-
-&lt;h2&gt;Visual Regression Test Requirements&lt;/h2&gt;
-
-&lt;p&gt;I&amp;rsquo;ve put together a conservative list of requirements for visual testing that came to my mind:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;Visual state is accessible to everyone with code access&lt;/li&gt;
-&lt;li&gt;Visual state history is tracked and managed&lt;/li&gt;
-&lt;li&gt;Any engineer can update the known visual state, documenting the previous and new state&lt;/li&gt;
-&lt;li&gt;Changes in an unrelated part of the screen won&amp;rsquo;t fail tests&lt;/li&gt;
-&lt;li&gt;Changes in the related part of the screen will fail tests&lt;/li&gt;
-&lt;li&gt;Failures should record with a visual diff indicating what failed&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;Many of these requirements are satisfied by some form of VCS, git for us at SalesLoft. The rest must be implemented in code.&lt;/p&gt;
-
-&lt;h2&gt;Capybara&lt;/h2&gt;
-
-&lt;p&gt;Capybara is the perfect tool for QA teams. Tests can be written against the entire stack and re-run in a predictable manner. There is a bit of leg-work here, and the speed of them makes Capybara undesirable for normal CI processes. However, having Capybara setup makes the screenshot diff process near trivial, due to the &lt;code&gt;page.save_screenshot&lt;/code&gt; method that Capybara exposes.&lt;/p&gt;
-
-&lt;p&gt;Setting up Capybara is beyond the scope of this post, so I&amp;rsquo;ll assume that you are at the point where &lt;code&gt;page.save_screenshot&lt;/code&gt; works for you, and your tests are runnable.&lt;/p&gt;
-
-&lt;h2&gt;Screenshot Process&lt;/h2&gt;
-
-&lt;p&gt;Taking a screenshot with &lt;code&gt;page.save_screenshot&lt;/code&gt; works well, but misses the requirement of unrelated screen changes failing tests. The current way that I get around this is by cropping the screenshot to the dimensions of a unique selector on the page.&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="ruby"&gt;image = page.save_screenshot(image_path)
-cropped_image = Magick::Image.read(image)[0].crop(
-  location.x - padding/2,
-  location.y - padding/2,
-  size.width + padding,
-  size.height + padding
-)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;The padding allows for a little bit of context on the page (where is this element?), but could be removed to have the exact dimensions of the element.&lt;/p&gt;
-
-&lt;h2&gt;ImageMagick (RMagick)&lt;/h2&gt;
-
-&lt;p&gt;ImageMagick provides a great image comparison algorithm which will provide the number of pixels changed and an image containing all changed components in bright red. It&amp;rsquo;s also perceptively fast for what it is doing.&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="ruby"&gt;diff_image, pixels_changed = existing_image.
-  compare_channel(image, Magick::AbsoluteErrorMetric)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;h2&gt;Putting it Together&lt;/h2&gt;
-
-&lt;p&gt;Putting together screenshot and diff capabilities gives everything needed to write visual regression tests. The interface that I&amp;rsquo;ve been working for now looks like this:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="ruby"&gt;ensure_pixel_perfection.
-  of(&amp;quot;some visual element&amp;quot;).
-  using(&amp;quot;#my-unique-selector&amp;quot;).
-  retina.
-  call
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;This will provide a file called fixtures/some-visual-element.png which gets created when the file doesn&amp;rsquo;t exist, and diff&amp;rsquo;d when it does exist. We commit this file to git and then update it when things change.&lt;/p&gt;
-
-&lt;p&gt;&lt;img src="https://cdn-images-1.medium.com/max/2000/1*WrEbDSd5kJpgljHrJ9x-7g.png" class="alignnone" /&gt;
-&lt;em&gt;A visual diff from SalesLoft Cadence where “Edit a Template” has been changed to “Create a Template”&lt;/em&gt;&lt;/p&gt;
-
-&lt;h2&gt;The Code&lt;/h2&gt;
-
-&lt;p&gt;I can&amp;rsquo;t promise support for your codebase, so I have chosen to not gemify this code. I&amp;rsquo;ve put it up as a &lt;a href="https://gist.github.com/sb8244/55246c51e469524f2abd0c17dd3c574e" target="_blank"&gt;gist&lt;/a&gt; instead. Note that this requires Rails, Capybara, and RMagick gems. You could adapt it to not be Rails dependent, if you are on something else.&lt;/p&gt;
 </content>
   </entry>
 </feed>
