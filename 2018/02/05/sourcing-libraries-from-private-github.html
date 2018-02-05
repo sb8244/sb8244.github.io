@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 Days - Sourcing Libraries from Private Github</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 Days - Sourcing Libraries from Private Github</h1>
+      <p>Hex is currently working on <a href="https://hex.pm/docs/private" target="_blank">private organizations</a> which
+are in beta. Until the full details of those are public and available, you may find
+yourself needing to source Elixir libraries privately. You may also just desire a quick
+fix and not setting up private packages. Enter git sourced packages.</p>
+
+<h2>Mix and Git</h2>
+
+<p>At the simplest form, you can think of git sourced dependencies as a clone of the provided
+repo using system git. In fact, the implementation is
+a <a href="https://github.com/elixir-lang/elixir/blob/f77cc2657cf981fdf819915f1ee15e69c3cd91ad/lib/mix/lib/mix/scm/git.ex#L250" target="_blank">shell out to git</a>.
+This means any repo which a system can access will be accessible via git, including
+repos which are locked behind private access.</p>
+
+<p>I have seen tags work as a good way to mark the versions in the git repo. The form looks
+something like:</p>
+
+<pre><code>{:my_dependency_name, git: &quot;git@github.com:Organization/repo.git&quot;, tag: &quot;v1.0.0&quot;},
+</code></pre>
+
+<p>The above mix.exs entry will fetch the mix package named <code>:my_dependency_name</code> from git@github.com:Organization/repo.git,
+commit tagged v1.0.0. <a href="https://help.github.com/articles/connecting-to-github-with-ssh/" target="_blank">Github SSH</a> access
+is used due to the repo being <code>git@github.com</code> format.</p>
+
+<h2>Trickery with Docker and CI</h2>
+
+<p>This all works well locally. In fact, just following the standard tutorial will lead to a working
+private dependency, locally. Things get a bit trickier when something like Docker or a build
+server is used to fetch your dependency. In this situation, the SSH key of each system would need
+to be included on Github. Another difficulty is that Docker containers have to have SSH keys added
+to them, they don&rsquo;t come with them standard. All of this leads to another possible solution:
+accessing Github via API keys.</p>
+
+<h2>API Key Setup</h2>
+
+<p><a href="https://github.com/blog/1509-personal-api-tokens" target="_blank">Github personal access tokens</a> can be used
+to access certain parts of Github, such as repository access. In order to use one with mix,
+just switch out the git url from <code>git@github.com:Organization/repo.git</code> to
+<code>https://#{access_token}@github.com/Organization/repo</code>. With this solution, any access token
+which has read access to the repo will serve as the access into Git.</p>
+
+<p>There does exist a drawback with this solution, the access token would need to be provided to
+every user of the application. This is non-desirable as the access token should really be kept
+secret, even to the point of being encrypted docker arguments. With a small tweak, it is possible to
+achieve the best of both worlds, SSH locally but access tokens for Docker.</p>
+
+<pre><code>defp deps do
+  [
+    {:phoenix, &quot;~&gt; 1.3.0&quot;},
+  ] ++ private_deps(System.get_env(&quot;MIX_GITHUB_ACCESS_TOKEN&quot;))
+end
+
+@my_dependency_version &quot;v1.0.0&quot;
+
+defp private_deps(nil) do
+  [
+    {:my_dependency_name, git: &quot;git@github.com:Organization/repo.git&quot;, tag: @my_dependency_version},
+  ]
+end
+
+defp private_deps(access_token) do
+  [
+    {:my_dependency_name, git: &quot;https://#{access_token}@github.com/Organization/repo&quot;, tag: @my_dependency_version},
+  ]
+end
+</code></pre>
+
+<p>This script will append the private dependencies into the deps list, but do so with
+either SSH or access token access. Dependency versions should always be constant, so
+it is pulled into an attribute.</p>
+
+<p>One caveat with this approach is that each mix invocation must contain the ENV, not
+just <code>deps.get</code>. This is due to the mix.lock being checked when mix runs, and the
+correct dependencies are pulled each time through the above code path.</p>
+
+<hr>
+
+<p>With the presented approach, there should be little trouble getting private repos
+both locally and in CI, without compromise on security of your keys. If the straight access
+token route is taken, take extra care regarding the permissions of the account behind
+the key.</p>
+
+<p>Thanks for reading the fourth post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+anticipate the posts to get more and more technical as the time goes on!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
