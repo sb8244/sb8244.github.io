@@ -13,7 +13,7 @@
     <link rel="alternate" href="https://stephenbussey.com/2018/02/06/elixir-node-networking-basics.html"/>
     <id>https://stephenbussey.com/2018/02/06/elixir-node-networking-basics.html</id>
     <published>2018-02-05T21:08:00-05:00</published>
-    <updated>2018-02-06T00:16:37-05:00</updated>
+    <updated>2018-02-06T00:17:22-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -119,8 +119,8 @@ in a future post as well.&lt;/p&gt;
 &lt;h2&gt;Addendum&lt;/h2&gt;
 
 &lt;p&gt;It was asked in the Elixir slack group if it&amp;rsquo;s possible to customize the distribution mechanism
-from TCP/IP to something else. It is! It&amp;rsquo;s fairly involved C code, but there is an example walking
-through a OS socket level distribution. http://erlang.org/doc/apps/erts/alt_dist.html&lt;/p&gt;
+from TCP/IP to something else. It is! It&amp;rsquo;s fairly involved C code, but there is &lt;a href="http://erlang.org/doc/apps/erts/alt_dist.html" target="_blank"&gt;an example&lt;/a&gt;
+walking through a OS socket level distribution.&lt;/p&gt;
 
 &lt;p&gt;In addition, some other drivers are provided out of the box, such as a
 &lt;a href="http://erlang.org/doc/apps/ssl/ssl_distribution.html" target="_blank"&gt;SSL driver&lt;/a&gt; for communicating
