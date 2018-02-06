@@ -127,6 +127,16 @@ for starters. The <a href="http://learnyousomeerlang.com/distribunomicon" target
 learnyousomeerlang.com goes over some of these concepts in detail. I&rsquo;ll be tackling them
 in a future post as well.</p>
 
+<h2>Addendum</h2>
+
+<p>It was asked in the Elixir slack group if it&rsquo;s possible to customize the distribution mechanism
+from TCP/IP to something else. It is! It&rsquo;s fairly involved C code, but there is an example walking
+through a OS socket level distribution. http://erlang.org/doc/apps/erts/alt_dist.html</p>
+
+<p>In addition, some other drivers are provided out of the box, such as a
+<a href="http://erlang.org/doc/apps/ssl/ssl_distribution.html" target="_blank">SSL driver</a> for communicating
+over SSL.</p>
+
 <hr>
 
 <p>I don&rsquo;t really read erlang code, so this post was very interesting today. However, a lot
