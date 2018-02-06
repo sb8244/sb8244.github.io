@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 Days - Elixir Node Networking Basics</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 Days - Elixir Node Networking Basics</h1>
+      <p>One of my favorite points in Elixir, some form of magic perhaps, is how simple
+distributed networking can be. The language itself seems to make establishing
+networked nodes and sending messages a pain-free exercise. While breaking down
+networking techniques is more than a single post, I am going to look into some of
+the basics of networking in Elixir. Specifically, what happens when we connect
+nodes together?</p>
+
+<h2>Nodes in Elixir</h2>
+
+<p>In Elixir, a <code>Node</code> could be defined as a single running instance. There can be
+multiple nodes running on a single machine. Let&rsquo;s use this to take a look at some
+basics of node communication, before diving into what is going on.</p>
+
+<pre><code># In shell 1
+iex --name test@127.0.0.1
+
+# In shell 2
+iex --name test2@127.0.0.1
+
+# In shell 1
+Node.self() # :&quot;test@127.0.0.1&quot;
+Node.list() # []
+Node.connect(:&quot;test2@127.0.0.1&quot;) # true
+Node.list() # [:&quot;test2@127.0.0.1&quot;]
+
+# In shell 2
+Node.list() # [:&quot;test@127.0.0.1&quot;]
+
+# Leave open
+</code></pre>
+
+<p>From the above interactive example, it&rsquo;s possible to see that 2 nodes are initially
+started, with a particular name of <code>test@127.0.0.1</code> or test2. These nodes start as
+disconnected, but can be manually connected. Once connected, both nodes are aware of the
+other node&rsquo;s existence.</p>
+
+<p>Finally, we can test out sending a message in the above processes:</p>
+
+<pre><code># In shell 1
+Node.spawn(:&quot;test2@127.0.0.1&quot;, fn -&gt; IO.inspect(Node.self()) end)
+#PID&lt;13084.113.0&gt;
+:&quot;test2@127.0.0.1&quot;
+</code></pre>
+
+<p>In the above example, a function is set to be executed on <code>:&quot;test2@127.0.01&quot;</code>. We can see
+that the result of the execution is a remote pid (doesn&rsquo;t start with 0) as well the output
+containing the node&rsquo;s name.</p>
+
+<p>The Node module contains lots of interesting tidbits that are actually implemented pretty
+thin on top of erlang modules. This post won&rsquo;t go into the ins and outs of node communication,
+although it&rsquo;s suffice to say that communication is generally done in better ways than
+spawning functions between the nodes.</p>
+
+<h2>Diving into a connection</h2>
+
+<p><a href="https://github.com/elixir-lang/elixir/blob/v1.6.1/lib/elixir/lib/node.ex#L150" target="_blank">Node.connect</a> provides
+a really simple 1-liner over <code>:net_kernel.connect_node/1</code>. Let&rsquo;s dig into this function and
+what some ramifications of using it are.</p>
+
+<p>Deep inside of the erlang OTP libraries, we start to see some interesting code in connection.
+Specifically, there is <a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L313" target="_blank">code</a>
+to handle automatic &ldquo;magical&rdquo; connection between nodes, vs more explicit connection dependencies.</p>
+
+<p><a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L342" target="_blank">Digging even further</a>,
+we discover that the <code>net_kernel</code> symbol is actually a process on the system. Running <code>Process.whereis(:net_kernel)</code>
+will return the pid of this net_kernel process.</p>
+
+<p><a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L422" target="_blank">The first time that a Node is connected to</a>,
+that connection is not present in the ets lookup table. This leads to setup being called and
+initializing that connection.</p>
+
+<p>By digging into <code>Process.whereis(:net_kernel) |&gt; :sys.get_state()</code>, it&rsquo;s possible to see that
+there is a structure like:</p>
+
+<pre><code>{:listen, #Port&lt;0.609&gt;, #PID&lt;0.49.0&gt;,
+    {:net_address, {{0, 0, 0, 0}, 56479}, &#39;Steves-MBP&#39;, :tcp, :inet},
+    :inet_tcp_dist}
+</code></pre>
+
+<p>This state is <a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L113" target="_blank">documented</a>
+and helps to let us trace the module that will actually connect our nodes together. Finally, we
+are able to track down the <a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/inet_tcp_dist.erl#L296" target="_blank">setup code</a>
+that is creating the TCP socket between the nodes.</p>
+
+<p>One small caveat of connecting to nodes is that &ldquo;cookies&rdquo; have to match up. This is
+essentially an atom that is initialized on boot and read from <code>~/.erlang.cookie</code>. Finding
+this was pretty challenging in erlang, but I traced it back to
+<a href="https://github.com/erlang/otp/blob/d99803e7625e474dee40f0dfebf2b8092add0336/lib/kernel/src/dist_util.erl#L216" target="_blank">dist_util</a>
+module. The code above (even if you can&rsquo;t read erlang) is doing some interesting challenge/reply
+protocol to ensure that the nodes are allowed to talk to each other.</p>
+
+<h2>After the connection</h2>
+
+<p>Of course, connecting via TCP here is just the beginning. There is significantly more
+at play, cookies to authenticate nodes and heartbeats to ensure connectivity between nodes
+for starters. The <a href="http://learnyousomeerlang.com/distribunomicon" target="_blank">distributed erlang guide</a> from
+learnyousomeerlang.com goes over some of these concepts in detail. I&rsquo;ll be tackling them
+in a future post as well.</p>
+
+<hr>
+
+<p>I don&rsquo;t really read erlang code, so this post was very interesting today. However, a lot
+of great things can be learned from digging into the erlang code and module documentation
+and not relying solely on Elixir docs. For instance, the documentation for node networking
+brings up great points around security and TLS node communication. Dive into the docs and
+see what you go from there; it might be useful one day when there&rsquo;s a problem that you
+just can&rsquo;t figure out.</p>
+
+<p>Thanks for reading the 5th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+anticipate a few more posts around networking, such as cookie gotchas, distillery release networking,
+and pg2.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>

@@ -4,10 +4,133 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-04T19:57:00-05:00</updated>
+  <updated>2018-02-05T21:08:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 Days - Elixir Node Networking Basics</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/06/elixir-node-networking-basics.html"/>
+    <id>https://stephenbussey.com/2018/02/06/elixir-node-networking-basics.html</id>
+    <published>2018-02-05T21:08:00-05:00</published>
+    <updated>2018-02-05T23:03:31-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;One of my favorite points in Elixir, some form of magic perhaps, is how simple
+distributed networking can be. The language itself seems to make establishing
+networked nodes and sending messages a pain-free exercise. While breaking down
+networking techniques is more than a single post, I am going to look into some of
+the basics of networking in Elixir. Specifically, what happens when we connect
+nodes together?&lt;/p&gt;
+
+&lt;h2&gt;Nodes in Elixir&lt;/h2&gt;
+
+&lt;p&gt;In Elixir, a &lt;code&gt;Node&lt;/code&gt; could be defined as a single running instance. There can be
+multiple nodes running on a single machine. Let&amp;rsquo;s use this to take a look at some
+basics of node communication, before diving into what is going on.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;# In shell 1
+iex --name test@127.0.0.1
+
+# In shell 2
+iex --name test2@127.0.0.1
+
+# In shell 1
+Node.self() # :&amp;quot;test@127.0.0.1&amp;quot;
+Node.list() # []
+Node.connect(:&amp;quot;test2@127.0.0.1&amp;quot;) # true
+Node.list() # [:&amp;quot;test2@127.0.0.1&amp;quot;]
+
+# In shell 2
+Node.list() # [:&amp;quot;test@127.0.0.1&amp;quot;]
+
+# Leave open
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;From the above interactive example, it&amp;rsquo;s possible to see that 2 nodes are initially
+started, with a particular name of &lt;code&gt;test@127.0.0.1&lt;/code&gt; or test2. These nodes start as
+disconnected, but can be manually connected. Once connected, both nodes are aware of the
+other node&amp;rsquo;s existence.&lt;/p&gt;
+
+&lt;p&gt;Finally, we can test out sending a message in the above processes:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;# In shell 1
+Node.spawn(:&amp;quot;test2@127.0.0.1&amp;quot;, fn -&amp;gt; IO.inspect(Node.self()) end)
+#PID&amp;lt;13084.113.0&amp;gt;
+:&amp;quot;test2@127.0.0.1&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In the above example, a function is set to be executed on &lt;code&gt;:&amp;quot;test2@127.0.01&amp;quot;&lt;/code&gt;. We can see
+that the result of the execution is a remote pid (doesn&amp;rsquo;t start with 0) as well the output
+containing the node&amp;rsquo;s name.&lt;/p&gt;
+
+&lt;p&gt;The Node module contains lots of interesting tidbits that are actually implemented pretty
+thin on top of erlang modules. This post won&amp;rsquo;t go into the ins and outs of node communication,
+although it&amp;rsquo;s suffice to say that communication is generally done in better ways than
+spawning functions between the nodes.&lt;/p&gt;
+
+&lt;h2&gt;Diving into a connection&lt;/h2&gt;
+
+&lt;p&gt;&lt;a href="https://github.com/elixir-lang/elixir/blob/v1.6.1/lib/elixir/lib/node.ex#L150" target="_blank"&gt;Node.connect&lt;/a&gt; provides
+a really simple 1-liner over &lt;code&gt;:net_kernel.connect_node/1&lt;/code&gt;. Let&amp;rsquo;s dig into this function and
+what some ramifications of using it are.&lt;/p&gt;
+
+&lt;p&gt;Deep inside of the erlang OTP libraries, we start to see some interesting code in connection.
+Specifically, there is &lt;a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L313" target="_blank"&gt;code&lt;/a&gt;
+to handle automatic &amp;ldquo;magical&amp;rdquo; connection between nodes, vs more explicit connection dependencies.&lt;/p&gt;
+
+&lt;p&gt;&lt;a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L342" target="_blank"&gt;Digging even further&lt;/a&gt;,
+we discover that the &lt;code&gt;net_kernel&lt;/code&gt; symbol is actually a process on the system. Running &lt;code&gt;Process.whereis(:net_kernel)&lt;/code&gt;
+will return the pid of this net_kernel process.&lt;/p&gt;
+
+&lt;p&gt;&lt;a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L422" target="_blank"&gt;The first time that a Node is connected to&lt;/a&gt;,
+that connection is not present in the ets lookup table. This leads to setup being called and
+initializing that connection.&lt;/p&gt;
+
+&lt;p&gt;By digging into &lt;code&gt;Process.whereis(:net_kernel) |&amp;gt; :sys.get_state()&lt;/code&gt;, it&amp;rsquo;s possible to see that
+there is a structure like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;{:listen, #Port&amp;lt;0.609&amp;gt;, #PID&amp;lt;0.49.0&amp;gt;,
+    {:net_address, {{0, 0, 0, 0}, 56479}, &amp;#39;Steves-MBP&amp;#39;, :tcp, :inet},
+    :inet_tcp_dist}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This state is &lt;a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L113" target="_blank"&gt;documented&lt;/a&gt;
+and helps to let us trace the module that will actually connect our nodes together. Finally, we
+are able to track down the &lt;a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/inet_tcp_dist.erl#L296" target="_blank"&gt;setup code&lt;/a&gt;
+that is creating the TCP socket between the nodes.&lt;/p&gt;
+
+&lt;p&gt;One small caveat of connecting to nodes is that &amp;ldquo;cookies&amp;rdquo; have to match up. This is
+essentially an atom that is initialized on boot and read from &lt;code&gt;~/.erlang.cookie&lt;/code&gt;. Finding
+this was pretty challenging in erlang, but I traced it back to
+&lt;a href="https://github.com/erlang/otp/blob/d99803e7625e474dee40f0dfebf2b8092add0336/lib/kernel/src/dist_util.erl#L216" target="_blank"&gt;dist_util&lt;/a&gt;
+module. The code above (even if you can&amp;rsquo;t read erlang) is doing some interesting challenge/reply
+protocol to ensure that the nodes are allowed to talk to each other.&lt;/p&gt;
+
+&lt;h2&gt;After the connection&lt;/h2&gt;
+
+&lt;p&gt;Of course, connecting via TCP here is just the beginning. There is significantly more
+at play, cookies to authenticate nodes and heartbeats to ensure connectivity between nodes
+for starters. The &lt;a href="http://learnyousomeerlang.com/distribunomicon" target="_blank"&gt;distributed erlang guide&lt;/a&gt; from
+learnyousomeerlang.com goes over some of these concepts in detail. I&amp;rsquo;ll be tackling them
+in a future post as well.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;I don&amp;rsquo;t really read erlang code, so this post was very interesting today. However, a lot
+of great things can be learned from digging into the erlang code and module documentation
+and not relying solely on Elixir docs. For instance, the documentation for node networking
+brings up great points around security and TLS node communication. Dive into the docs and
+see what you go from there; it might be useful one day when there&amp;rsquo;s a problem that you
+just can&amp;rsquo;t figure out.&lt;/p&gt;
+
+&lt;p&gt;Thanks for reading the 5th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+anticipate a few more posts around networking, such as cookie gotchas, distillery release networking,
+and pg2.&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 Days - Sourcing Libraries from Private Github</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/05/sourcing-libraries-from-private-github.html"/>
@@ -557,228 +680,6 @@ mind that Elixir automatically distributes across cores).&lt;/p&gt;
 
 &lt;p&gt;I hope this helped or solidified GenServer concepts for you. Please feel free to reach out
 with any cool tips or tricks.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Get Your Rails Out Of My Ruby - HTTP &amp; Controllers</title>
-    <link rel="alternate" href="https://stephenbussey.com/2017/09/04/get-your-rails-out-of-my-ruby-http.html"/>
-    <id>https://stephenbussey.com/2017/09/04/get-your-rails-out-of-my-ruby-http.html</id>
-    <published>2017-09-04T14:33:00-04:00</published>
-    <updated>2017-09-29T15:19:43-04:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;On Friday September 22 (2017), I&amp;rsquo;ll be presenting a talk at &lt;a href="http://connect.tech/" target="_blank"&gt;connect.tech&lt;/a&gt; conference entitled &amp;ldquo;Get Your
-Rails out of My Ruby&amp;rdquo;. This talk is going to be looking at alternatives to writing Ruby code in a Rails application that don&amp;rsquo;t
-involve doing everything the &amp;ldquo;Rails way.&amp;rdquo; This post and future posts leading up to the talk will look at certain common areas
-where Rails is used; this post will be about controllers and your HTTP interface.&lt;/p&gt;
-
-&lt;h2&gt;Rails Controllers - Benefits &amp;amp; Challenges&lt;/h2&gt;
-
-&lt;p&gt;Rails has done so much for the Ruby community and is arguably the best collection of &amp;ldquo;getting started practices&amp;rdquo; that exists
-for web development. Other frameworks are catching up to it, but it has been innovating in its own way to keep pace. Rails handles
-creating a web interface gracefully and provides mechanisms to do it securely (versus rolling it all yourself from scratch).
-ActionController, specifically, has a few large benefits (not an exhaustive list):&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;Clean interface to write routes and controllers quickly&lt;/li&gt;
-&lt;li&gt;ActionController::Parameters for securely handling parameters, beyond a simple Hash&lt;/li&gt;
-&lt;li&gt;Easy to use router&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;With these benefits, I&amp;rsquo;ve seen some challenges from relying on Rails for everything web-interface related:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;The default use of controllers leads to web &amp;amp; application code coupled together tightly&lt;/li&gt;
-&lt;li&gt;Many ways to achieve objectives, some better and some worse than others. How do you know what&amp;rsquo;s better when getting started?&lt;/li&gt;
-&lt;li&gt;Router is flexible and will let you do things you maybe shouldn&amp;rsquo;t be (1 controller with many endpoints)&lt;/li&gt;
-&lt;li&gt;Larger learning curve than may be necessary due to generic functionality&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;When getting started with a new application or product, these tradeoffs might be entirely acceptable, and I would argue that they
-most likely are acceptable for a majority of use cases. However, these tradeoffs begin to appear less worth it as an application,
-business, or customer base increases in size. Specifically, the tight coupling of web and application code.&lt;/p&gt;
-
-&lt;h2&gt;Web / Application Coupling&lt;/h2&gt;
-
-&lt;p&gt;Your app is not a web app; your app is more than that. Your application is solving problems for businesses or consumers. Your application
-has a problem domain that isn&amp;rsquo;t just &amp;ldquo;the web.&amp;rdquo; When building your application, are you writing and communicating in your business&amp;rsquo;s
-context, or in the context of &amp;ldquo;the web?&amp;rdquo;&lt;/p&gt;
-
-&lt;p&gt;&lt;a href="https://en.wikipedia.org/wiki/Conway%27s_law" target="_blank"&gt;Conway&amp;rsquo;s law&lt;/a&gt; says that your application design will reflect the communication structure
-of your business. This is due to the needs of individuals in the organization to communicate effectively with each other. Let&amp;rsquo;s look
-at an example of how this might play out in application code:&lt;/p&gt;
-
-&lt;p&gt;Your banking software is designed to support operations of the tellers for your bank branches. When customers come into the bank, they
-submit &amp;ldquo;withdrawal slips&amp;rdquo; to the tellers, who process these slips and issue &amp;ldquo;money withdrawals&amp;rdquo; back to the customers. Your company has
-codified this business process for the software written for the tellers, which is accessed via a web interface on their computers.
-When designing the classes for this software, what are the &amp;ldquo;withdrawal slips&amp;rdquo; and &amp;ldquo;money withdrawals&amp;rdquo; called?&lt;/p&gt;
-
-&lt;p&gt;In the &amp;ldquo;Rails way&amp;rdquo; mindset, these might end up being simple &amp;ldquo;Controller Actions&amp;rdquo; which produce &amp;ldquo;Views&amp;rdquo; viewed by the tellers.
-The slips contents are passed around the controllers by &amp;ldquo;params&amp;rdquo;. The web application creeps into the code in this way,
-naming concepts by Rails concepts rather than business domains. The web / application domains are now coupled with each other.&lt;/p&gt;
-
-&lt;h2&gt;Problems with Coupling&lt;/h2&gt;
-
-&lt;p&gt;Being real, this tight naming coupling isn&amp;rsquo;t going to cripple your app; you may not even notice side effects for a while. However,
-slowly things might end up happening:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;Engineers become unable to communicate in the organization without mentally translating concepts&lt;/li&gt;
-&lt;li&gt;Engineers doing refactors are struggling to discover the business intents, as the business concepts are not obvious&lt;/li&gt;
-&lt;li&gt;Tighter coupling has caused bugs in one section to propagate down to another section of code, causing worse problems&lt;/li&gt;
-&lt;li&gt;No mapping of language was ever created, people aren&amp;rsquo;t sure of the mapping anymore&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;All of these problems are going to escalate to the business level at some point, they aren&amp;rsquo;t simply engineering issues. Particularly
-decreased productivity and large refactors to reduce coupling.&lt;/p&gt;
-
-&lt;div style="text-align: center"&gt;
-  &lt;img src="/images/get-your-rails-out/traditional-design.png" alt="traditional rails coupling, large seam" /&gt;
-  &lt;div&gt;
-    &lt;small&gt;
-      &lt;i&gt;Example of Rails design that introduces a high degree of coupling&lt;/i&gt;
-    &lt;/small&gt;
-  &lt;/div&gt;
-&lt;/div&gt;
-
-&lt;p&gt;In the above image, a traditional Rails Way design is shown. Rails routes the request to a controller, which utilizes service objects
-to implement business logic. These service objects are tied to the controller if any business logic is implemented in the controller,
-such as parameter defaults, safety checks, etc. It is possible to reduce coupling by making the controllers as dumb as possible, but
-I&amp;rsquo;m not sure that this plays out as expected in the real world.&lt;/p&gt;
-
-&lt;p&gt;In my view, the biggest issue with this design is that the application logic ends up tied in some way to a controller. This makes it
-not possible to invoke the business logic without reading the controller, understanding it, and duplicating that setup somewhere else.
-This introduces the above issues, such as lack of clear understanding, tight coupling, and more difficult refactors.&lt;/p&gt;
-
-&lt;h2&gt;A different way?&lt;/h2&gt;
-
-&lt;p&gt;What if our business logic was able to be separated from the web logic via object separation. This is fairly common in the Rails
-world with the introduction of &amp;ldquo;service objects.&amp;rdquo; These objects are wrappers to encapsulate behavior. Instead of the &amp;ldquo;withdrawal slip&amp;rdquo;
-being represented by the &lt;code&gt;params&lt;/code&gt; of a &lt;code&gt;Request&lt;/code&gt;, perhaps there is a &lt;code&gt;WithdrawalSlip&lt;/code&gt; object which has codified that business concept.
-The controller will then create a &lt;code&gt;WithdrawalSlip&lt;/code&gt; and process it via a &lt;code&gt;MoneyWithdrawalProcess&lt;/code&gt;.&lt;/p&gt;
-
-&lt;p&gt;This small alternative immediately provides some benefits to the engineers and organization. The concepts are apparent in the code,
-and the engineering team is able to make sense of the names compared to how the business operates. The changes allows the codebase
-to get further, but there are still some problems. Every endpoint for the banking interface now has to create and manage respective
-objects, and construct results into responses for the tellers. The interface has become less Rails specific, but actual functionality
-is still heavily reliant on Rails. This means that engineers unfamiliar with the codebase (new hires) may end up doing something
-The Rails Way rather than the way that has been established by the team, simply because it&amp;rsquo;s possible and they are not familiar with
-the team&amp;rsquo;s way yet. This might lead to tension (&amp;ldquo;You only do it this way because you&amp;rsquo;re afraid of change!&amp;rdquo;) or code erosion over time,
-neither of which are good.&lt;/p&gt;
-
-&lt;h2&gt;Separating business logic completely away from the web logic&lt;/h2&gt;
-
-&lt;p&gt;What if the web logic was completely separated from the business logic? I don&amp;rsquo;t mean the service object extraction mentioned previously,
-but an actual fully operating application that doesn&amp;rsquo;t involve the web at all. This is possible to do, but involves separating the
-two concepts and only combining them at very small seams.&lt;/p&gt;
-
-&lt;p&gt;The actual development of the application logic is very specific to your use case, which makes it hard to offer suggestions on how
-to achieve it. However, a general goal should be to have the entire application &amp;ldquo;runnable via CLI.&amp;rdquo; This creates an artificial goal
-of not having code that is deeply integrated with being accessed via the web. Another artificial goal is that all tests for the
-application should not involve the web at all. There are no &amp;ldquo;controllers&amp;rdquo; nor &amp;ldquo;actions&amp;rdquo; at this point, just your business logic.&lt;/p&gt;
-
-&lt;p&gt;When this is achieved for the business logic, new development questions might be &amp;ldquo;how do we want to name and design this functionality?&amp;rdquo;,
-rather than &amp;ldquo;how can I build this functionality in Rails?&amp;rdquo; Abstractions and patterns could be established in the code that aren&amp;rsquo;t
-apparent otherwise, due to the artificial web limitations.&lt;/p&gt;
-
-&lt;div style="text-align: center"&gt;
-  &lt;img src="/images/get-your-rails-out/decoupled-design.png" alt="decoupled rails design, small seam" /&gt;
-  &lt;div&gt;
-    &lt;small&gt;
-      &lt;i&gt;Example of Rails design that introduces a low degree of coupling&lt;/i&gt;
-    &lt;/small&gt;
-  &lt;/div&gt;
-&lt;/div&gt;
-
-&lt;p&gt;In the above example, a design is proposed that introduces a single seam between a controller (singular) and the application. This
-design introduces a very low level of coupling, and the code that is coupled is generic code implemented for all endpoints. In practice,
-I&amp;rsquo;ve found that this seam can be as low as three files: routing, request, response.&lt;/p&gt;
-
-&lt;p&gt;The most significant advantage to this design is that the application is completely able to be executed independent of a web request,
-maybe the business needs some CLI runners, or a fancy web socket based API. This design would make it possible to implement these
-interfaces in a low number of files, without changing the application at all.&lt;/p&gt;
-
-&lt;h2&gt;Creating a seam with Rails&lt;/h2&gt;
-
-&lt;p&gt;I&amp;rsquo;ve made a lot of suggestions about taking your code away from Rails, so it seems that I should advise on how to create a seam
-with Rails. Rails still solves a lot of problems that micro-frameworks like Sinatra just don&amp;rsquo;t solve. It&amp;rsquo;s also nice to be able to
-use something that Rails provides when you really do need it. For these reasons, I would suggest creating the seam with Rails rather
-than creating a seam to another framework. However, there is nothing so far that indicates you need to use Rails for web! Your
-entire business logic is represented without Rails web code present, and could be accessed via any type of interface: Rails,
-Sinatra, CLI, Websockets, etc.&lt;/p&gt;
-
-&lt;p&gt;One way to interface with Rails is by defining routes in the router, pointed at some controller structure that you desire. A
-&lt;a href="https://en.wikipedia.org/wiki/Front_controller" target="_blank"&gt;front controller&lt;/a&gt; becomes a viable choice here, as the single controller/action
-creates a very small seam with the application. You could also still approach 1 action per endpoint, but your seam will be much
-larger and could be prone to leaking through or being difficult to maintain.&lt;/p&gt;
-
-&lt;p&gt;Let&amp;rsquo;s look at how you might approach the router:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="ruby"&gt;# config/application.rb
-# Setup your routes via a custom routes file that properly autoloads locally like routes.rb does
-config.paths[&amp;quot;config/routes.rb&amp;quot;].unshift(Rails.root.join(&amp;quot;config&amp;quot;, &amp;quot;custom_routes.rb&amp;quot;))
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;pre&gt;&lt;code class="ruby"&gt;# config/routes.rb
-# Integrate your routes via a context adapter
-Rails.application.routes.draw do
-  RailsAdapters::Routes.define_routes(self)
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;pre&gt;&lt;code class="ruby"&gt;# lib/rails_adapters/routes.rb
-# Define your routes on the context provided
-
-class RailsAdapters::Routes
-  def self.define_routes(context)
-    new(MyRouter.instance).call(context)
-  end
-
-  def intialize(router)
-    @router = router
-  end
-
-  def call(context)
-    @router.routes.each do |route|
-      # route.type =&amp;gt; :get | :post | :put | :delete
-      # route.path =&amp;gt; &amp;quot;api/money_withdrawls/:id&amp;quot;
-      options = { controller: &amp;quot;front&amp;quot;, action: &amp;quot;execute&amp;quot;, executor: route.executor }
-      context.send route.type, route.path, options
-    end
-  end
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;pre&gt;&lt;code class="ruby"&gt;# app/controllers/front_controller.rb
-class FrontController &amp;lt; ApplicationController
-  def execute # routing happened previously
-    request = RailsAdapters::Request.new(self) # request adapter
-    response = params[:executor].new(request).call # response adapter
-    render json: response, status: response.status # RailsAdapters::Response.new(self).call(response) rather?
-  end
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;&lt;em&gt;The three steps I mentioned previously are visible here: routing, request, response.&lt;/em&gt;&lt;/p&gt;
-
-&lt;p&gt;So far, I&amp;rsquo;ve offered a way to define some routes in a separate place than the routes file. This may not seem great, as there is
-not a ton of code, but that is the point! There doesn&amp;rsquo;t need to be a ton of code to create this seam with Rails. With a small
-FrontController that can handle the clue between Rails request concepts and responses, we&amp;rsquo;re able to create lightweight adapters.
-If we wanted to move this code to something like Sinatra, we would rewrite these adapters only, 0 business logic changes.&lt;/p&gt;
-
-&lt;p&gt;One technique that can really help writing these adapters is the &amp;ldquo;context&amp;rdquo; concept above. By passing &lt;code&gt;self&lt;/code&gt; in as a parameter to
-a method, every method on that context will be available in the consuming class. In this way, we could access &lt;code&gt;context.params&lt;/code&gt;,
-&lt;code&gt;context.render&lt;/code&gt;, &lt;code&gt;context.get&lt;/code&gt;, etc. The code that is adapting can have full access to the Rails context, without necessarily
-being tied to Rails.&lt;/p&gt;
-
-&lt;h2&gt;Wrap it up&amp;hellip;&lt;/h2&gt;
-
-&lt;p&gt;If you approach your business code as a separate entity from your Rails (or framework in general) code, you will be able to
-write the code that you &lt;em&gt;want&lt;/em&gt; to write, rather than the code you&amp;rsquo;re &lt;em&gt;forced&lt;/em&gt; to write. Look for design patterns that suit
-your needs and make sense in your context. I utilize a &amp;ldquo;front controller&amp;rdquo; pattern, but there are other patterns for web interfaces
-that could work for you! If you&amp;rsquo;re tied to The Rails Way, you might miss these patterns and be forced into someone else&amp;rsquo;s
-design choices.&lt;/p&gt;
 </content>
   </entry>
 </feed>
