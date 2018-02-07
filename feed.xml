@@ -13,7 +13,7 @@
     <link rel="alternate" href="https://stephenbussey.com/2018/02/07/peerage-deep-dive.html"/>
     <id>https://stephenbussey.com/2018/02/07/peerage-deep-dive.html</id>
     <published>2018-02-06T21:10:00-05:00</published>
-    <updated>2018-02-06T21:27:53-05:00</updated>
+    <updated>2018-02-06T21:32:17-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -111,7 +111,7 @@ laid out in the &lt;a href="/2018/02/06/elixir-node-networking-basics.html" targ
 kubernetes. It is great to see that there is no hacky implementations under the covers. It is
 simply easy to follow and debug Elixir code, falling back on known erlang libraries.&lt;/p&gt;
 
-&lt;p&gt;Thanks for reading the 5th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+&lt;p&gt;Thanks for reading the 6th post in my 28 days of Elixir. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 anticipate a few more posts around networking, such as cookie gotchas, distillery release networking,
 and pg2.&lt;/p&gt;
