@@ -4,10 +4,119 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-05T21:08:00-05:00</updated>
+  <updated>2018-02-06T21:10:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 Days - Peerage Deep Dive</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/07/peerage-deep-dive.html"/>
+    <id>https://stephenbussey.com/2018/02/07/peerage-deep-dive.html</id>
+    <published>2018-02-06T21:10:00-05:00</published>
+    <updated>2018-02-06T21:27:53-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I am going to continue off of &lt;a href="/2018/02/06/elixir-node-networking-basics.html" target="_blank"&gt;yesterdays&amp;rsquo; post&lt;/a&gt;
+in order to look at how the &lt;a href="https://github.com/mrluc/peerage" target="_blank"&gt;Peerage&lt;/a&gt; library works. Peerage
+is a pretty awesome library which makes Node discovery in distributed environments very easy.&lt;/p&gt;
+
+&lt;h2&gt;Peerage Strategies&lt;/h2&gt;
+
+&lt;p&gt;Peerage offers &lt;a href="https://github.com/mrluc/peerage#usage" target="_blank"&gt;several strategies&lt;/a&gt; which allow
+for Node discovery. The most common one for me has been DNS, but the others can be just
+as valuable depending on environment.&lt;/p&gt;
+
+&lt;p&gt;At the &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/self.ex" target="_blank"&gt;simplest&lt;/a&gt;, a
+Peerage discovery service must respond to the &lt;code&gt;poll()&lt;/code&gt; function. This is a pretty small
+interface, which would make creating new discovery strategies very easy. The
+&lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/self.ex" target="_blank"&gt;self&lt;/a&gt; strategy only
+returns the current node in a List, which is essentially a no-op.&lt;/p&gt;
+
+&lt;p&gt;We can look a little deeper at something that might do some actual connectivity,
+the &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/list.ex#L28" target="_blank"&gt;list&lt;/a&gt; strategy.
+As we can see from this code, it&amp;rsquo;s really not complex. The application is setup with a list
+of Node symbols, and those will try to connect through this strategy.&lt;/p&gt;
+
+&lt;p&gt;Now we can finally get into some real work, with the &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/udp.ex#L45" target="_blank"&gt;UDP strategy&lt;/a&gt;.
+UDP can be used to connect in a situation where nodes are on the same network, but are generally
+unware of what other nodes are on the network. Digging into the UDP strategy, we can see that
+UDP messages are sent over the network, and include the format &lt;code&gt;&amp;quot;Peer#{node()}&amp;quot;&lt;/code&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;@doc &amp;quot;Broadcast our node name via UDP every 3-7 seconds&amp;quot;
+def handle_info(:broadcast, state = %{conn: {addr, port, sock}}) do
+  :ok = :gen_udp.send(sock, addr, port, [&amp;quot;Peer:#{ node() }&amp;quot;])
+  Process.send_after(self(), :broadcast, :rand.uniform(4_000) + 3_000)
+  {:noreply, state}
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;When a UDP packet comes in, matching the format, that node is logged into state.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;@doc &amp;quot;Handle UDP packet. If it&amp;#39;s a node name broadcast, adds to `state.seen`.&amp;quot;
+def handle_info({:udp,sock,_,_, &amp;quot;Peer:&amp;quot; &amp;lt;&amp;gt; name}, state = %{seen: ms}) do
+  Logger.debug &amp;quot;  -&amp;gt; Peerage.Via.Udp sees: #{ name }&amp;quot;
+  :inet.setopts(sock, active: 1)
+  {:noreply, %{state | seen: ms |&amp;gt; MapSet.put(name |&amp;gt; String.to_atom)}}
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Finally, &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/udp.ex#L52" target="_blank"&gt;this state is returned&lt;/a&gt; synchronously
+when requested by the poller we saw previously.&lt;/p&gt;
+
+&lt;p&gt;I really like this general approach because we can see that there isn&amp;rsquo;t real magic going on. Nodes
+are broadcasting their name over the UDP connectionless protocol, and then letting the polling
+service take over from there (which will be explained below).&lt;/p&gt;
+
+&lt;p&gt;Finally, the &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/dns.ex#L32" target="_blank"&gt;DNS strategy&lt;/a&gt;, can
+be used in multi-node situations where IPs are mapped to a DNS record. In kubernetes, for example,
+the nodes can be mapped into a headless service and then resolved from there. The poll mechanism
+of the DNS strategy is even simpler than UDP. Simply take the provided DNS name, look it up
+using &lt;code&gt;:inet_res.lookup(&amp;#39;domain.com&amp;#39;, :in, :a)&lt;/code&gt;, and then &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/dns.ex#L38" target="_blank"&gt;turn the provided IPs into connectable
+names&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2&gt;Connection&lt;/h2&gt;
+
+&lt;p&gt;My favorite part of peerage, by far, is how simple the &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/server.ex" target="_blank"&gt;server&lt;/a&gt;
+is that actually connects nodes together. The polling code triggers the &lt;code&gt;discover&lt;/code&gt; method
+and reschedules for some interval in the future. If you haven&amp;rsquo;t seen it before, the
+&lt;code&gt;Process.send_after&lt;/code&gt; line here is very common for creating gen servers which do some
+regular interval&amp;rsquo;d work.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;def handle_info(:poll, state) do
+  discover()
+  Process.send_after(self(), :poll, interval() * 1000)
+  {:noreply, state}
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Finally, the real simplicity comes out with node connections:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;defp discover do
+  poll()
+  |&amp;gt; only_fresh_node_names
+  |&amp;gt; Enum.map(&amp;amp;([&amp;amp;1, Node.connect(&amp;amp;1)]))
+  |&amp;gt; log_results
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The nodes are polled using the mechanisms we saw previously, then compared against currently
+connected nodes. &lt;code&gt;Node.connect&lt;/code&gt; is then called on the symbol provided by the providers, and attempted
+to connect to. When a Node connects, erlang handles all of the security and heartbeat, as
+laid out in the &lt;a href="/2018/02/06/elixir-node-networking-basics.html" target="_blank"&gt;previous post&lt;/a&gt;.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;This simple and elegant library has been a cornerstone for me connecting nodes together in
+kubernetes. It is great to see that there is no hacky implementations under the covers. It is
+simply easy to follow and debug Elixir code, falling back on known erlang libraries.&lt;/p&gt;
+
+&lt;p&gt;Thanks for reading the 5th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+anticipate a few more posts around networking, such as cookie gotchas, distillery release networking,
+and pg2.&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 Days - Elixir Node Networking Basics</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/06/elixir-node-networking-basics.html"/>
@@ -481,215 +590,6 @@ I didn&amp;rsquo;t cover. Feel free to reach out if you have any question about 
 works or if you have awesome tools that you can&amp;rsquo;t live without!&lt;/p&gt;
 
 &lt;p&gt;See ya tomorrow hopefully! It is only day 1, so we&amp;rsquo;ll have to see how it goes.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Designing Elixir Supervisor Trees</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/01/08/designing-elixir-supervisor-trees.html"/>
-    <id>https://stephenbussey.com/2018/01/08/designing-elixir-supervisor-trees.html</id>
-    <published>2018-01-07T21:47:00-05:00</published>
-    <updated>2018-02-01T01:56:07-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;Over the past year, I&amp;rsquo;ve been getting more and more into Elixir. The language and
-paradigm has shifted how I think about coding in Ruby and has been incredibly &lt;em&gt;fun&lt;/em&gt;
-to work with. One of the core concepts of an Elixir application is the supervision tree.
-Let&amp;rsquo;s dive into some patterns that I typically use, along with some real code.&lt;/p&gt;
-
-&lt;h2&gt;Supervisors and Processes&lt;/h2&gt;
-
-&lt;p&gt;A process in Elixir is an isolated unit of execution. Processes have their own stack,
-&amp;ldquo;run queue&amp;rdquo;, and garbage collection. Because of this level of isolation, it helps to think
-of them as small programs that can talk to other small programs in an application. Processes
-are crucial for storing and accessing dynamic data, as well as for implementing transformations
-around data. A process executes all operations in its run queue sequentially, but multiple
-run queues can execute concurrently (leading to true concurrency). If you are curious about this
-specifically, I find
-Hamidreza Soleimani&amp;rsquo;s &lt;a href="https://hamidreza-s.github.io/erlang/scheduling/real-time/preemptive/migration/2016/02/09/erlang-scheduler-details.html" target="_blank"&gt;blog post&lt;/a&gt;
-fascinating.&lt;/p&gt;
-
-&lt;p&gt;A supervisor is a process that manages the lifecycles of child processes. This most often
-comes through as a fault tolerance mechanism. If a process crashes, the parent supervisor
-can choose to restart it, let it stay dead, restart it and all peers, etc. A supervisor
-can supervise other supervisors, which leads to a supervision tree.&lt;/p&gt;
-
-&lt;h2&gt;Modeling a Problem&lt;/h2&gt;
-
-&lt;p&gt;The problem that I&amp;rsquo;m going to discuss today is the model of a game server for the game
-generals.io. This is a turn-based &amp;ldquo;real-time&amp;rdquo; strategy game that involves capturing towns
-with armies and overtaking the enemy generals. Users can queue up moves to execute sequentially
-over turns. This allows complex moves to be planned out and executed without losing time.&lt;/p&gt;
-
-&lt;p&gt;In this problem, there are a few concepts that stick out to me:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;Board: A board is the representation of what the current state of the game is. This would
-include the cell types, the state of the armies, the fog of war, etc&lt;/li&gt;
-&lt;li&gt;Command queue: This stores the entire set of commands for the game. It is write-ahead and
-knows what commands have been executed and which are in the future (and on which turn)&lt;/li&gt;
-&lt;li&gt;Player list: Not as obvious as the others, but we need to know what players are in a game,
-and what the mapping is to their login&lt;/li&gt;
-&lt;li&gt;Game: The game contains all of the above things and ticks every so often, progressing the
-gameplay along&lt;/li&gt;
-&lt;li&gt;Game list: Building an online game requires supporting multiple games at once&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;I&amp;rsquo;m going to walk through each of these concepts (in order) and explain the approach I
-took in implementing the supervision tree. First, let&amp;rsquo;s see what that supervision tree
-might look like.&lt;/p&gt;
-
-&lt;h2&gt;Supervision Tree for Our Game&lt;/h2&gt;
-
-&lt;p&gt;What I&amp;rsquo;m about to present doesn&amp;rsquo;t come immediately (well, maybe with more practice),
-and is something that came about through iterations and testing the waters with different
-code. This is the final product, which I&amp;rsquo;ll go into more detail on. The [] syntax indicates
-what the children are.&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;Application -&amp;gt; [GamesSupervisor, GameRegistry, WebEndpoint]
-GamesSupervisor (1 child type) -&amp;gt; [GameSupervisor (dynamic)]
-GameSupervisor (4 child type) -&amp;gt; [BoardServer, CommandQueueServer, TickServer, PlayerServer]
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;h2&gt;BoardServer &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/board_server.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
-
-&lt;p&gt;When building the game, I started with the board object and naturally progressed into
-the BoardServer. I feel that starting on the inner nodes of the supervisor can make
-it more obvious what the next steps are, rather than trying to plan out everything
-at once.&lt;/p&gt;
-
-&lt;p&gt;Notes on the code:&lt;/p&gt;
-
-&lt;p&gt;I&amp;rsquo;ve found myself trying to keep servers as simple as possible,
-and executing complex logic in plain old modules which don&amp;rsquo;t have any GenServer
-capability. When looking at the BoardServer, I&amp;rsquo;m happy to see that there is no
-real logic in it, other than turn + 1.&lt;/p&gt;
-
-&lt;p&gt;Defining a simple interface is crucial for communication between GenServers. I&amp;rsquo;ve
-found myself getting stuck in between more verbose interfaces in the past and always
-regret whatever brought me there.&lt;/p&gt;
-
-&lt;p&gt;You&amp;rsquo;ll notice that I don&amp;rsquo;t use any of the GenServer helpers to remove boiler plate.
-I&amp;rsquo;ve found that keeping it to pure Elixir makes it easier to read in the long run,
-and increases my consistency across projects.&lt;/p&gt;
-
-&lt;h2&gt;CommandQueueServer &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/command_queue_server.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
-
-&lt;p&gt;Following the theme of keeping GenServers simple, this one is even more simple.
-When I&amp;rsquo;m dealing with a GenServer that really only touches one thing, like this one
-dealing with a Queue implementation, I do like to reach for Agent. Using an Agent
-removes the need to build a real GenServer implementation, and increases the
-readability significantly.&lt;/p&gt;
-
-&lt;p&gt;I don&amp;rsquo;t find myself reaching for an Agent often, and will pull it out to a regular
-GenServer if it gets too complex.&lt;/p&gt;
-
-&lt;h2&gt;PlayerServer &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/player_server.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
-
-&lt;p&gt;This is another simple Agent implementation that I feel like got a little bit sloppy.
-This is due to the use of a Map rather than a custom data structure. To clean up
-this code, I would look at extracting the Map behavior into a specific PlayerList
-module.&lt;/p&gt;
-
-&lt;h2&gt;TickServer &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/tick_server.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
-
-&lt;p&gt;I love this TickServer. One of my favorite lines of code in Elixir has been:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;Process.send_after(self(), :start_tick, timeout)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;This code is going to send a message from one process to itself, but set for the future.
-This allows creation of non-blocking (while the waiting is happening) GenServer implementations
-that are implemented entirely using native Elixir concepts.&lt;/p&gt;
-
-&lt;p&gt;Another interesting point here is that the TickServer accepts a &lt;code&gt;ticker_fn&lt;/code&gt; in the server
-initialization. We&amp;rsquo;ll see this pop up in our GameServer later. I thought this technique was
-really interesting (and was sort of surprised it worked). It works due to the fact that
-a fn in Elixir can be passed around like any other variable, and Elixir is stateless which
-means that the fn doesn&amp;rsquo;t get any context from where it is defined. Be warned, however, that
-executing a fn in the TickServer is going to block the TickServer until that function
-completes; it is not going to execute in the server that defined the fn.&lt;/p&gt;
-
-&lt;h2&gt;GameSupervisor &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/game_supervisor.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
-
-&lt;p&gt;There&amp;rsquo;s a lot going on in this supervisor, so let&amp;rsquo;s take it slow and just look at a few
-specific concepts.&lt;/p&gt;
-
-&lt;p&gt;The first thing to point out is the use of Registry:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;def start_link(opts = %{game_id: id}) do
-  Supervisor.start_link(__MODULE__, opts, name: {:via, Registry, {get_registry_name(), id}})
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Using the Registry allows for a named dynamic lookup / uniqueness of a GenServer. The
-supervisor is defined by the id passed in, which would prevent two games from ever sharing
-the same id at the same time. As you can imagine, that would be bad. We can take advantage
-of the uniqueness as well, because another GenServer that is started with this id will return
-the pid in the start_link call. We&amp;rsquo;ll see this through in the GamesSupervisor below.&lt;/p&gt;
-
-&lt;p&gt;Another useful code snippet is for looking up a process by type under a supervisor:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;defp find_child_type(sup_pid, type) do
-  Enum.find(Supervisor.which_children(sup_pid), {nil, nil, nil, nil}, fn({mod, _pid, _type, _}) -&amp;gt;
-    mod == type
-  end) |&amp;gt; elem(1)
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;I&amp;rsquo;ve begun putting this in a Utils namespace in my new projects, but the gist is simple.
-By using the supervisor&amp;rsquo;s pid, we can list out all of its children and find the one
-with a given type (or base it on other things). GameSupervisor only has 1 child of
-each type, which makes this work well.&lt;/p&gt;
-
-&lt;p&gt;Our trust &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/game_supervisor.ex#L76" target="_blank"&gt;ticker_fn&lt;/a&gt; is
-defined in this GameSupervisor. The reason I took this approach is that the knowledge of how to tick
-should belong to something separate from what the ticking behavior is. Looking at this now,
-I would probably pull this code into another module since it&amp;rsquo;s so long.&lt;/p&gt;
-
-&lt;h2&gt;GamesSupervisor &lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/game/games_supervisor.ex" target="_blank"&gt;[code]&lt;/a&gt;&lt;/h2&gt;
-
-&lt;p&gt;We&amp;rsquo;ve finally made it to the top of the supervision tree with the GamesSupervisor. This
-supervisor takes advantage of the GameRegistry to provide game lookups:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;def get_game(id, opts \\ []) do
-  options = Keyword.merge([name: __MODULE__], opts)
-  Supervisor.start_child(options[:name], [%{game_id: id}]) |&amp;gt; case do
-    {:error, {:already_started, pid}} -&amp;gt; pid
-    {:error, _} -&amp;gt; nil
-  end
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;In this case, the GameSupervisor is identified by the id, which will return when
-&lt;code&gt;{:error, {:already_started, pid}}&lt;/code&gt; is returned from the start_child call. I use
-this pattern in nearly every dynamic supervisor that I&amp;rsquo;ve written. I do typically
-implement start/get in the same method (starting if it doesn&amp;rsquo;t exist, getting if it does),
-but I found that to not work well as creating a new game involves several complex
-operations such as board generation.&lt;/p&gt;
-
-&lt;h2&gt;Registry&lt;/h2&gt;
-
-&lt;p&gt;If you use a Registry, you do need to start it as a process in your application. I
-generally just include it at the top level of my
-&lt;a href="https://github.com/sb8244/generals/blob/aaea0e672f5dc0ebe616f4558a2c5912dd590da0/lib/generals/application.ex#L9" target="_blank"&gt;Application module&lt;/a&gt;.&lt;/p&gt;
-
-&lt;h2&gt;Final Thoughts&lt;/h2&gt;
-
-&lt;p&gt;One good sign that your supervision tree has come together well is a very simple
-mounting of it onto your final Application. Writing &lt;code&gt;supervisor(Generals.GamesSupervisor, [])&lt;/code&gt;
-seems like a very clean interface for interacting with my game supervision tree, and
-I feel good about that.&lt;/p&gt;
-
-&lt;p&gt;Another key thing to think of when writing your supervision tree is what can / will
-execute concurrently. For instance, let&amp;rsquo;s say that your PlayerList is implemented in
-the same GenServer as the Board. If you want to access the PlayerList to see who is
-in a game, it would not be able to run concurrently with Board operations. By splitting
-them up into separate GenServer implementations, they can execute concurrently (keep in
-mind that Elixir automatically distributes across cores).&lt;/p&gt;
-
-&lt;p&gt;I hope this helped or solidified GenServer concepts for you. Please feel free to reach out
-with any cool tips or tricks.&lt;/p&gt;
 </content>
   </entry>
 </feed>

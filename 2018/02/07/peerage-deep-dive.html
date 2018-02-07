@@ -1,0 +1,161 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 Days - Peerage Deep Dive</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 Days - Peerage Deep Dive</h1>
+      <p>I am going to continue off of <a href="/2018/02/06/elixir-node-networking-basics.html" target="_blank">yesterdays&rsquo; post</a>
+in order to look at how the <a href="https://github.com/mrluc/peerage" target="_blank">Peerage</a> library works. Peerage
+is a pretty awesome library which makes Node discovery in distributed environments very easy.</p>
+
+<h2>Peerage Strategies</h2>
+
+<p>Peerage offers <a href="https://github.com/mrluc/peerage#usage" target="_blank">several strategies</a> which allow
+for Node discovery. The most common one for me has been DNS, but the others can be just
+as valuable depending on environment.</p>
+
+<p>At the <a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/self.ex" target="_blank">simplest</a>, a
+Peerage discovery service must respond to the <code>poll()</code> function. This is a pretty small
+interface, which would make creating new discovery strategies very easy. The
+<a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/self.ex" target="_blank">self</a> strategy only
+returns the current node in a List, which is essentially a no-op.</p>
+
+<p>We can look a little deeper at something that might do some actual connectivity,
+the <a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/list.ex#L28" target="_blank">list</a> strategy.
+As we can see from this code, it&rsquo;s really not complex. The application is setup with a list
+of Node symbols, and those will try to connect through this strategy.</p>
+
+<p>Now we can finally get into some real work, with the <a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/udp.ex#L45" target="_blank">UDP strategy</a>.
+UDP can be used to connect in a situation where nodes are on the same network, but are generally
+unware of what other nodes are on the network. Digging into the UDP strategy, we can see that
+UDP messages are sent over the network, and include the format <code>&quot;Peer#{node()}&quot;</code>:</p>
+
+<pre><code>@doc &quot;Broadcast our node name via UDP every 3-7 seconds&quot;
+def handle_info(:broadcast, state = %{conn: {addr, port, sock}}) do
+  :ok = :gen_udp.send(sock, addr, port, [&quot;Peer:#{ node() }&quot;])
+  Process.send_after(self(), :broadcast, :rand.uniform(4_000) + 3_000)
+  {:noreply, state}
+end
+</code></pre>
+
+<p>When a UDP packet comes in, matching the format, that node is logged into state.</p>
+
+<pre><code>@doc &quot;Handle UDP packet. If it&#39;s a node name broadcast, adds to `state.seen`.&quot;
+def handle_info({:udp,sock,_,_, &quot;Peer:&quot; &lt;&gt; name}, state = %{seen: ms}) do
+  Logger.debug &quot;  -&gt; Peerage.Via.Udp sees: #{ name }&quot;
+  :inet.setopts(sock, active: 1)
+  {:noreply, %{state | seen: ms |&gt; MapSet.put(name |&gt; String.to_atom)}}
+end
+</code></pre>
+
+<p>Finally, <a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/udp.ex#L52" target="_blank">this state is returned</a> synchronously
+when requested by the poller we saw previously.</p>
+
+<p>I really like this general approach because we can see that there isn&rsquo;t real magic going on. Nodes
+are broadcasting their name over the UDP connectionless protocol, and then letting the polling
+service take over from there (which will be explained below).</p>
+
+<p>Finally, the <a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/dns.ex#L32" target="_blank">DNS strategy</a>, can
+be used in multi-node situations where IPs are mapped to a DNS record. In kubernetes, for example,
+the nodes can be mapped into a headless service and then resolved from there. The poll mechanism
+of the DNS strategy is even simpler than UDP. Simply take the provided DNS name, look it up
+using <code>:inet_res.lookup(&#39;domain.com&#39;, :in, :a)</code>, and then <a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/dns.ex#L38" target="_blank">turn the provided IPs into connectable
+names</a>.</p>
+
+<h2>Connection</h2>
+
+<p>My favorite part of peerage, by far, is how simple the <a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/server.ex" target="_blank">server</a>
+is that actually connects nodes together. The polling code triggers the <code>discover</code> method
+and reschedules for some interval in the future. If you haven&rsquo;t seen it before, the
+<code>Process.send_after</code> line here is very common for creating gen servers which do some
+regular interval&rsquo;d work.</p>
+
+<pre><code>def handle_info(:poll, state) do
+  discover()
+  Process.send_after(self(), :poll, interval() * 1000)
+  {:noreply, state}
+end
+</code></pre>
+
+<p>Finally, the real simplicity comes out with node connections:</p>
+
+<pre><code>defp discover do
+  poll()
+  |&gt; only_fresh_node_names
+  |&gt; Enum.map(&amp;([&amp;1, Node.connect(&amp;1)]))
+  |&gt; log_results
+end
+</code></pre>
+
+<p>The nodes are polled using the mechanisms we saw previously, then compared against currently
+connected nodes. <code>Node.connect</code> is then called on the symbol provided by the providers, and attempted
+to connect to. When a Node connects, erlang handles all of the security and heartbeat, as
+laid out in the <a href="/2018/02/06/elixir-node-networking-basics.html" target="_blank">previous post</a>.</p>
+
+<hr>
+
+<p>This simple and elegant library has been a cornerstone for me connecting nodes together in
+kubernetes. It is great to see that there is no hacky implementations under the covers. It is
+simply easy to follow and debug Elixir code, falling back on known erlang libraries.</p>
+
+<p>Thanks for reading the 5th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+anticipate a few more posts around networking, such as cookie gotchas, distillery release networking,
+and pg2.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
