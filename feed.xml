@@ -4,10 +4,97 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-06T21:10:00-05:00</updated>
+  <updated>2018-02-07T22:31:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 Days - The Beauty of Macros</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/08/the-beauty-of-macros.html"/>
+    <id>https://stephenbussey.com/2018/02/08/the-beauty-of-macros.html</id>
+    <published>2018-02-07T22:31:00-05:00</published>
+    <updated>2018-02-07T22:47:39-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I&amp;rsquo;m aiming for a shorter post today, as I presented a 50 minute talk about &amp;ldquo;Elixir in Production&amp;rdquo;
+at the Atlanta Elixir Meetup tonight. I&amp;rsquo;m proud of how the talk turned out, but I&amp;rsquo;m
+also looking forward to hearing what content will make it better, and submitting it
+to conferences.&lt;/p&gt;
+
+&lt;p&gt;For the end of the first week (7th day) of Elixir writing, I wanted to break down a
+small chunk of code that I recently wrote that utilizes macros. In particular,
+there&amp;rsquo;s a cool property of macros that I want to explain. Let&amp;rsquo;s just go into the code:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;defmodule SalesloftApi.Phoenix.Router do
+  defmacro setup({:__aliases__, _ctx, module_path}, controller) do
+    router_module = Module.concat(module_path)
+
+    router_module.min_api_version()..router_module.current_api_version()
+    |&amp;gt; Enum.flat_map(fn api_version -&amp;gt;
+      router_module.routes()
+      |&amp;gt; Map.values()
+      |&amp;gt; Enum.map(fn route = %{http_verb: verb} -&amp;gt;
+        path = SalesloftApi.Route.path(route)
+
+        quote do
+          scope &amp;quot;/v#{unquote(api_version)}&amp;quot; do
+            unquote(verb)(unquote(path), unquote(controller), :execute, assigns: %{route: unquote(Macro.escape(route))})
+          end
+        end
+      end)
+    end)
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;For context, this code is an adapter to convert between a router module and phoenix routes.
+We are doing this in order to provide our API at a level outside of just HTTP (like websockets or
+console) and to ensure that we can control how the API is documented at a very native
+level. I previous &lt;a href="/2017/09/04/get-your-rails-out-of-my-ruby-http.html" target="_blank"&gt;wrote&lt;/a&gt; about a similar
+concept in Ruby.&lt;/p&gt;
+
+&lt;p&gt;This code is a macro which accepts a module and a controller module into it. It&amp;rsquo;s intended to be
+called from a Phoenix.Router module.&lt;/p&gt;
+
+&lt;p&gt;The code follows this simplified flow:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Iterate over available versions of the API (2-&amp;gt;2 currently)&lt;/li&gt;
+&lt;li&gt;Iterate over the available routes&lt;/li&gt;
+&lt;li&gt;Generate some Phoenix.Router compatible code like:&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;pre&gt;&lt;code&gt;scope &amp;quot;/v2&amp;quot; do
+  get(&amp;quot;/widgets&amp;quot;, FrontController, :execute, assigns: %{route: route})
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Provide the generated code as the macro&amp;rsquo;s return.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Here is my &lt;strong&gt;favorite&lt;/strong&gt; part of this code: it doesn&amp;rsquo;t know what phoenix is. This project
+does not take phoenix in as a dependency&amp;hellip;you don&amp;rsquo;t need to use phoenix to use this module.
+What needs to happen is that there must be code that supports &lt;code&gt;scope&lt;/code&gt; and &lt;code&gt;get&lt;/code&gt;/friends in
+the module that calls this. It just happens to be phoenix.&lt;/p&gt;
+
+&lt;p&gt;This captures the flexibility of Elixir very concisely. The code that a macro generates is
+&amp;ldquo;placed into&amp;rdquo; the call site, and the original library doesn&amp;rsquo;t execute that code.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;If you do decide to learn what macros are about, I can&amp;rsquo;t recommend
+&lt;a href="https://pragprog.com/book/cmelixir/metaprogramming-elixir" target="_blank"&gt;Metaprogramming Elixir&lt;/a&gt; enough.
+I found the book to be excellent at highlighting how macros are really used in the
+Elixir code that I use daily.&lt;/p&gt;
+
+&lt;p&gt;Thanks for reading the 7th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+am leaving for vacation tomorrow. I&amp;rsquo;m excited for the time to reflect on interesting topics and
+to have more time in the evening to write about them&amp;hellip;hopefully. Cheers!&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 Days - Peerage Deep Dive</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/07/peerage-deep-dive.html"/>
@@ -493,103 +580,6 @@ when you don&amp;rsquo;t!&lt;/p&gt;
 
 &lt;p&gt;Thanks for reading, today. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 days of Elixir - Development Environment</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/01/28-days-of-elixir-development-environment.html"/>
-    <id>https://stephenbussey.com/2018/02/01/28-days-of-elixir-development-environment.html</id>
-    <published>2018-02-01T01:30:00-05:00</published>
-    <updated>2018-02-02T01:41:19-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;Welcome to day 1 of (hopefully) 28 days of Elixir! I&amp;rsquo;ve set a goal to write a technical blog
-post every single day this month, and I&amp;rsquo;m really excited about Elixir right now. I don&amp;rsquo;t know
-what the entire series will bring, but I do know that I&amp;rsquo;ll basically have to be putting all of my
-thoughts and experiences about Elixir out there over the next month.&lt;/p&gt;
-
-&lt;p&gt;I&amp;rsquo;m going to start this series off with something light: development environments. Specifically,
-the one that I use and things that I&amp;rsquo;ve found enjoyable coming from another language like Ruby
-or Javascript. I don&amp;rsquo;t intend to convince anyone of anything on this (especially with regards
-to editors), but I do think there&amp;rsquo;s some interesting things about Elixir specifically that
-can apply to every environment. Let&amp;rsquo;s jump in.&lt;/p&gt;
-
-&lt;h2&gt;Elixir Installation&lt;/h2&gt;
-
-&lt;p&gt;I use &lt;a href="https://github.com/taylor/kiex" target="_blank"&gt;kiex&lt;/a&gt; to manage my elixir versions
-and &lt;a href="https://github.com/kerl/kerl" target="_blank"&gt;kerl&lt;/a&gt; to manage my erlang/OTP versions. kiex has
-been great, it&amp;rsquo;s really easy to use! I have to say that I&amp;rsquo;m genuinely impressed with
-how little speed bumps I&amp;rsquo;ve encountered over time. I do recommend using some sort of
-version manager rather than brew, because there will definitely be more than one project
-in Elixir over time!&lt;/p&gt;
-
-&lt;p&gt;kerl on the other hand, has generally been fairly painful to use. I think the biggest
-thing here is that Elixir versions need recompiled once OTP is changed. I could be
-wrong here because I haven&amp;rsquo;t had to do it too often, but I do distinctly remember
-significant pain from the OTP 20 upgrade. This happens very infrequently though.&lt;/p&gt;
-
-&lt;p&gt;One thing that I wish kiex had was the concept of a .elixir-version file like rbenv. It
-has to be done manually right now, which is error prone on a team.&lt;/p&gt;
-
-&lt;h2&gt;My Editor&lt;/h2&gt;
-
-&lt;p&gt;Although I&amp;rsquo;ve tried to get into other editors over time, I have found myself drawn again
-and again to the simplicity and flexibility of atom, so that&amp;rsquo;s what I&amp;rsquo;ve been using lately.
-There are 3 packages that I use specifically for atom that are, I think, absolute
-must haves: atom-elixir, language-elixir, elixir-jump-around.&lt;/p&gt;
-
-&lt;p&gt;atom-elixir and language-elixir provide the base for the actual act of authoring code.
-The auto-complete functionality works generally well, although there are some core quirks.
-Due to how Elixir compilation works, tools like atom-elixir look into the actual _build
-output of the code to produce auto-complete and documentation services. This is really interesting
-to me, because it means that &lt;em&gt;any&lt;/em&gt; editor should be able to accomplish that same task. Whether
-emacs, vim, vscode, whatever is being used, it should be completely achievable to have full
-auto-complete and documentation capabilities.&lt;/p&gt;
-
-&lt;p&gt;In addition to great auto-complete capabilities, atom-elixir has a really good &amp;ldquo;go to definition&amp;rdquo;
-functionality. When I am authoring Ruby code, I find that only Rubymine has been able to
-achieve true definition jumping. ctags can provide some of it, but jumping into installed
-libraries is very useful for debugging problems or understanding how a method works. For example,
-do you want to know how an Enum method is implemented? Just alt+click and you&amp;rsquo;re there! Elixir&amp;rsquo;s
-compilation design makes this all possible in any editor, not just a Jetbrains editor. Check
-it out!&lt;/p&gt;
-
-&lt;p&gt;Lastly, &amp;ldquo;jump to test&amp;rdquo; is so useful for me. My typical flow for creating a file has become:&lt;/p&gt;
-
-&lt;ol&gt;
-&lt;li&gt;Create the module in my lib folder somewhere&lt;/li&gt;
-&lt;li&gt;Press opt-g-t to jump to the non-existent file&lt;/li&gt;
-&lt;li&gt;Copy the module definition, add Test to it, then save the file&lt;/li&gt;
-&lt;/ol&gt;
-
-&lt;p&gt;I&amp;rsquo;m able to do this entire flow very quickly and without navigating a file tree.&lt;/p&gt;
-
-&lt;h2&gt;Docker vs Native Execution&lt;/h2&gt;
-
-&lt;p&gt;Some people really like to develop software on the OS that is going to run it in production,
-and more power to them! However, I&amp;rsquo;ve found myself drawn to having software that is runnable
-on my macbook, natively, rather than using a tool like Docker or Vagrant. However, I do utilize
-Docker for CI and production build processes.&lt;/p&gt;
-
-&lt;h2&gt;Mix Format&lt;/h2&gt;
-
-&lt;p&gt;I&amp;rsquo;ve begrudgingly accepted the mix formatter over the past few weeks. I find that I often
-have issues with getting a file to format in certain situations. This seems like a bug in the formatter,
-though. The format itself is generally agreeable but sometimes is not and there is no
-customization route. I think that it&amp;rsquo;s better to accept a standard, even if it&amp;rsquo;s not
-my desired standard, if it improves the community and team at large.&lt;/p&gt;
-
-&lt;p&gt;I run this manually as I go. Now that I think about it more, I should probably have this setup
-in some semi-automated fashion until it becomes too slow.&lt;/p&gt;
-
-&lt;h2&gt;Wrapping up&lt;/h2&gt;
-
-&lt;p&gt;That ended up being longer than I anticipated, but I&amp;rsquo;m still sure there are many things
-I didn&amp;rsquo;t cover. Feel free to reach out if you have any question about how my setup
-works or if you have awesome tools that you can&amp;rsquo;t live without!&lt;/p&gt;
-
-&lt;p&gt;See ya tomorrow hopefully! It is only day 1, so we&amp;rsquo;ll have to see how it goes.&lt;/p&gt;
 </content>
   </entry>
 </feed>

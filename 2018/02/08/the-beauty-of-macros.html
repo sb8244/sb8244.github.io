@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 Days - The Beauty of Macros</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 Days - The Beauty of Macros</h1>
+      <p>I&rsquo;m aiming for a shorter post today, as I presented a 50 minute talk about &ldquo;Elixir in Production&rdquo;
+at the Atlanta Elixir Meetup tonight. I&rsquo;m proud of how the talk turned out, but I&rsquo;m
+also looking forward to hearing what content will make it better, and submitting it
+to conferences.</p>
+
+<p>For the end of the first week (7th day) of Elixir writing, I wanted to break down a
+small chunk of code that I recently wrote that utilizes macros. In particular,
+there&rsquo;s a cool property of macros that I want to explain. Let&rsquo;s just go into the code:</p>
+
+<pre><code>defmodule SalesloftApi.Phoenix.Router do
+  defmacro setup({:__aliases__, _ctx, module_path}, controller) do
+    router_module = Module.concat(module_path)
+
+    router_module.min_api_version()..router_module.current_api_version()
+    |&gt; Enum.flat_map(fn api_version -&gt;
+      router_module.routes()
+      |&gt; Map.values()
+      |&gt; Enum.map(fn route = %{http_verb: verb} -&gt;
+        path = SalesloftApi.Route.path(route)
+
+        quote do
+          scope &quot;/v#{unquote(api_version)}&quot; do
+            unquote(verb)(unquote(path), unquote(controller), :execute, assigns: %{route: unquote(Macro.escape(route))})
+          end
+        end
+      end)
+    end)
+  end
+end
+</code></pre>
+
+<p>For context, this code is an adapter to convert between a router module and phoenix routes.
+We are doing this in order to provide our API at a level outside of just HTTP (like websockets or
+console) and to ensure that we can control how the API is documented at a very native
+level. I previous <a href="/2017/09/04/get-your-rails-out-of-my-ruby-http.html" target="_blank">wrote</a> about a similar
+concept in Ruby.</p>
+
+<p>This code is a macro which accepts a module and a controller module into it. It&rsquo;s intended to be
+called from a Phoenix.Router module.</p>
+
+<p>The code follows this simplified flow:</p>
+
+<ol>
+<li>Iterate over available versions of the API (2-&gt;2 currently)</li>
+<li>Iterate over the available routes</li>
+<li>Generate some Phoenix.Router compatible code like:</li>
+</ol>
+
+<pre><code>scope &quot;/v2&quot; do
+  get(&quot;/widgets&quot;, FrontController, :execute, assigns: %{route: route})
+end
+</code></pre>
+
+<ol>
+<li>Provide the generated code as the macro&rsquo;s return.</li>
+</ol>
+
+<p>Here is my <strong>favorite</strong> part of this code: it doesn&rsquo;t know what phoenix is. This project
+does not take phoenix in as a dependency&hellip;you don&rsquo;t need to use phoenix to use this module.
+What needs to happen is that there must be code that supports <code>scope</code> and <code>get</code>/friends in
+the module that calls this. It just happens to be phoenix.</p>
+
+<p>This captures the flexibility of Elixir very concisely. The code that a macro generates is
+&ldquo;placed into&rdquo; the call site, and the original library doesn&rsquo;t execute that code.</p>
+
+<hr>
+
+<p>If you do decide to learn what macros are about, I can&rsquo;t recommend
+<a href="https://pragprog.com/book/cmelixir/metaprogramming-elixir" target="_blank">Metaprogramming Elixir</a> enough.
+I found the book to be excellent at highlighting how macros are really used in the
+Elixir code that I use daily.</p>
+
+<p>Thanks for reading the 7th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+am leaving for vacation tomorrow. I&rsquo;m excited for the time to reflect on interesting topics and
+to have more time in the evening to write about them&hellip;hopefully. Cheers!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
