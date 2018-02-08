@@ -70,20 +70,20 @@ called from a Phoenix.Router module.</p>
 
 <p>The code follows this simplified flow:</p>
 
-<ol>
+<ul>
 <li>Iterate over available versions of the API (2-&gt;2 currently)</li>
 <li>Iterate over the available routes</li>
 <li>Generate some Phoenix.Router compatible code like:</li>
-</ol>
+</ul>
 
 <pre><code>scope &quot;/v2&quot; do
   get(&quot;/widgets&quot;, FrontController, :execute, assigns: %{route: route})
 end
 </code></pre>
 
-<ol>
+<ul>
 <li>Provide the generated code as the macro&rsquo;s return.</li>
-</ol>
+</ul>
 
 <p>Here is my <strong>favorite</strong> part of this code: it doesn&rsquo;t know what phoenix is. This project
 does not take phoenix in as a dependency&hellip;you don&rsquo;t need to use phoenix to use this module.
