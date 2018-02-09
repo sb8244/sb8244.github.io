@@ -4,10 +4,120 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-07T22:31:00-05:00</updated>
+  <updated>2018-02-08T22:20:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 Days - Demo - Single process in a distributed system</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/09/demo-explanation-single-process-in-a-distributed-system.html"/>
+    <id>https://stephenbussey.com/2018/02/09/demo-explanation-single-process-in-a-distributed-system.html</id>
+    <published>2018-02-08T22:20:00-05:00</published>
+    <updated>2018-02-08T23:37:33-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I&amp;rsquo;m really excited about this post, I&amp;rsquo;ve been thinking about what the demo will
+look like for several days, but it turned out differently than I had in my head.
+I&amp;rsquo;m writing this from 35k feet on my way to vacation; there&amp;rsquo;s nothing better than
+being on a plane to hash out technical problems that have been put off. It would
+be great if the wifi worked though&amp;hellip;&lt;/p&gt;
+
+&lt;p&gt;Today&amp;rsquo;s post is going to be a demo + walkthrough of creating a singular process
+chokepoint in a distributed system. That might not be the best way to explain it, but
+I&amp;rsquo;m also struggling to find a better explanation. The end goal is that in a cluster
+of 3 nodes, I can say &amp;ldquo;request id 1&amp;rdquo; and have that go to node 1 every time. I can say
+&amp;ldquo;request id 3&amp;rdquo; and have that go to node 3.&lt;/p&gt;
+
+&lt;h2&gt;Code / Demo&lt;/h2&gt;
+
+&lt;p&gt;The code is found at &lt;a href="https://www.github.com/sb8244/distributed_process_demo" target="_blank"&gt;https://www.github.com/sb8244/distributed_process_demo&lt;/a&gt;.
+The repo has instructions for the actual demo and how it should be run.&lt;/p&gt;
+
+&lt;p&gt;This code is in the intermediate category, probably. However, it&amp;rsquo;s short and the
+tools used are core for building Elixir apps. Don&amp;rsquo;t be shy to dig in and break it
+locally to really learn what&amp;rsquo;s going on!&lt;/p&gt;
+
+&lt;h2&gt;How it works&lt;/h2&gt;
+
+&lt;p&gt;Elixir has the ability to connect to other nodes that are accessible on the network. We
+can use this to spawn several local nodes that simulate a networked environment. The
+&lt;a href="https://github.com/sb8244/distributed_process_demo/blob/master/lib/distributed_process.ex#L4" target="_blank"&gt;&lt;code&gt;DistributedProcess.connect()&lt;/code&gt;&lt;/a&gt;
+function iterates on up to 5 known node names and connects to them. This is a quick hack to get them connected.&lt;/p&gt;
+
+&lt;p&gt;The application creates two different top level supervisors, a &lt;code&gt;Registry&lt;/code&gt; which allows
+unique storage of processes (unique by ID here) and a &lt;code&gt;DistributedProcess.Supervisor&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;The &lt;a href="https://github.com/sb8244/distributed_process_demo/blob/master/lib/distributed_process/supervisor.ex" target="_blank"&gt;&lt;code&gt;DistributedProcess.Supervisor&lt;/code&gt;&lt;/a&gt;
+does the majority of the work for distributing our
+process across the cluster. It accepts an &lt;code&gt;id&lt;/code&gt; into the &lt;code&gt;get_worker/1&lt;/code&gt; function, and
+uses a modulo operator on the number of nodes to determine which node will be the lucky
+receiver of this request. The size of a node is fairly consistent in practice, so this
+seems acceptable for starters.&lt;/p&gt;
+
+&lt;p&gt;When the right node is chosen, the &lt;code&gt;DynamicSupervisor.start_child&lt;/code&gt; call creates an instance
+of a &lt;code&gt;DistributedProcess.Worker&lt;/code&gt; on the local or remote chosen node. This Worker is setup to
+be unique based on the ID. This is really helpful as it allows future calls to the same ID
+to return the same process.&lt;/p&gt;
+
+&lt;p&gt;Once a local or remote pid is returned from the DynamicSupervisor, that pid has a &lt;code&gt;call&lt;/code&gt; request
+execute against it. &lt;code&gt;call&lt;/code&gt; will return an answer synchronously, which is great for the purposes
+of this demo.&lt;/p&gt;
+
+&lt;p&gt;In the &lt;a href="https://github.com/sb8244/distributed_process_demo/blob/master/lib/distributed_process/worker.ex" target="_blank"&gt;&lt;code&gt;DistributedProcess.Worker&lt;/code&gt;&lt;/a&gt;,
+the first thing is does is actually tell itself to be destroyed
+in 5 seconds. This is to make the demo interesting, but also simulates the use case of a short
+lived cache.&lt;/p&gt;
+
+&lt;p&gt;The &lt;code&gt;handle_call(:request)&lt;/code&gt; function in the worker does 2 different things, for 2 different
+function heads. The first is if there is a value in the local state. Then it is simply
+returned as is. The second is if there is no value in the local state. A random 1-1000
+integer is selected and placed in the state, along with the node name. This allows us to see
+that the data is in fact changing every 5 seconds, and where it came from.&lt;/p&gt;
+
+&lt;p&gt;All of this is packaged up into 2 top level functions that are called: &lt;code&gt;DistributedProcess.connect()&lt;/code&gt;
+and &lt;code&gt;DistributedProcess.request(id)&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2&gt;Use Case&lt;/h2&gt;
+
+&lt;p&gt;It may be desirable to have a single choke point across a cluster to handle a single
+type of request. For instance, maybe a certain tenant should only execute on a single
+server. This ensures that the requests for that tenant are serial (non-parallel).&lt;/p&gt;
+
+&lt;p&gt;My use case is to cache requests to a certain resource/id pair for 30-60 seconds. I want
+to make a single request, then return that value for the lifetime of it. I do not
+want to introduce a DB layer just for this caching, as maintaining that is prone to
+easier logic errors around cache expiration and checking.&lt;/p&gt;
+
+&lt;h2&gt;Final Thoughts&lt;/h2&gt;
+
+&lt;p&gt;I&amp;rsquo;m most excited about how this code doesn&amp;rsquo;t really feel remote. It can run on a
+local system just as well as in a clustered system, and it scales with cluster size
+with no additional work. That is pretty fun!&lt;/p&gt;
+
+&lt;p&gt;I don&amp;rsquo;t know how I would easily test this code. Not having internet led me to not
+test this code today. However, I will probably look into how I can test it and write
+about that in the future. I have had several requests for testing posts, especially
+if they involve complex setups.&lt;/p&gt;
+
+&lt;p&gt;I do not know, yet, how I would handle a situation of fetching an array of ids. I would
+want the cache to be distributed, but there is a challenge in not having the same id
+set each time. This sort of breaks the technique, but it doesn&amp;rsquo;t mean it&amp;rsquo;s not valuable
+for single / deterministic ids.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;Thanks to my co-worker Ben for bouncing this idea around at SalesLoft. We haven&amp;rsquo;t placed
+the technique in production yet, but him and I were both really excited to talk about it.
+I&amp;rsquo;m curious to see how he would approach this type of problem, as I know he had more
+elegant solutions in mind.&lt;/p&gt;
+
+&lt;p&gt;Thanks for reading the 8th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
+really want to see!&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 Days - The Beauty of Macros</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/08/the-beauty-of-macros.html"/>
@@ -497,88 +607,6 @@ champion for the education and empowerment of the team. Look for interesting way
 people have and remove the roadblocks that pop-up as quick as you can.&lt;/p&gt;
 
 &lt;p&gt;Thanks for reading the third post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 days of Elixir - Silly Mistakes I Make Again and Again</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/02/28-days-of-elixir-silly-mistakes-i-make-again-and-again.html"/>
-    <id>https://stephenbussey.com/2018/02/02/28-days-of-elixir-silly-mistakes-i-make-again-and-again.html</id>
-    <published>2018-02-02T01:30:00-05:00</published>
-    <updated>2018-02-02T02:10:29-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;It&amp;rsquo;s day 2 of my 28 days of Elixir blogging. I have 5 more ideas in the funnel, and I fear
-that coming up with 28 interesting topics will be hard. I&amp;rsquo;ll definitely be leaning on
-co-workers for ideas, but don&amp;rsquo;t hesitate to reach out if you have any interesting ideas
-that you&amp;rsquo;d want me to explore!&lt;/p&gt;
-
-&lt;p&gt;I&amp;rsquo;ve been writing Elixir daily at SalesLoft, and have gotten pretty quick with development
-and testing of my apps. However, a few things just keep catching me up every time:&lt;/p&gt;
-
-&lt;h2&gt;Charlist and Strings&lt;/h2&gt;
-
-&lt;p&gt;In both Ruby and Javascript, it is acceptable to swap &amp;lsquo; and &amp;ldquo;  for strings, in many cases.
-This means that &amp;#39;a&amp;rsquo; === &amp;quot;a&amp;rdquo; in Javascript. However, &amp;lsquo;a&amp;rsquo; != &amp;ldquo;a&amp;rdquo; in Elixir. This is due to
-charlist and string being implemented differently. Charlist is often used for interfacing
-with erlang directly, because erlang does not have the concept of &amp;ldquo;strings&amp;rdquo;.&lt;/p&gt;
-
-&lt;p&gt;One mistake I will often catch is swapping the usage of the quote constructs and then
-doing equality or other comparisons, and being bewildered when the strings do not match.
-Catching this error can be a bit tricky if the error message doesn&amp;rsquo;t show you that the
-types are different, but a usual symptom is being completely bewildered why two matching
-strings are not matching. The most significant place to pay attention to is when interfacing
-with code between libraries, as the target and source are separated.&lt;/p&gt;
-
-&lt;h2&gt;Running mix test on the source file&lt;/h2&gt;
-
-&lt;p&gt;This one is always a face-palmer. When running &lt;code&gt;mix test test/my_test.exs&lt;/code&gt;, be careful of
-accidentally copying a path like &lt;code&gt;mix test lib/my.ex&lt;/code&gt;. The symptom of this mistake is a
-passing spec suite which runs 0 specs, and complains about a re-defined module.&lt;/p&gt;
-
-&lt;h2&gt;Define a test file with the same name as the real module, rather than test&lt;/h2&gt;
-
-&lt;p&gt;My flow for creating a module is to create the source module (.ex), then running
-(opt-g-t) to create a test script (.exs). I will then copy the source module definition
-and add ExUnit and &lt;code&gt;Test&lt;/code&gt; to the end of the module.&lt;/p&gt;
-
-&lt;p&gt;As I&amp;rsquo;m going red/green on my code, I sometimes find myself shocked that a function
-doesn&amp;rsquo;t exist when I most certainly just defined it. After looking around wondering
-what is going on, I realize I forgot to include &lt;code&gt;Test&lt;/code&gt; at the end of the module. This
-re-initializes the module (without real code) but is still a sementically valid
-test file.&lt;/p&gt;
-
-&lt;h2&gt;Not recognizing pattern matching in test helpers such as assert received&lt;/h2&gt;
-
-&lt;p&gt;This is one of the more interesting / subtle mistakes that I find myself making. I especially
-see this in older Elixir code that I wrote where I didn&amp;rsquo;t fully understand what was
-going on.&lt;/p&gt;
-
-&lt;p&gt;I will be doing a task like writing / testing a websocket channel and find that my
-code passes perfectly when I know that it&amp;rsquo;s definitely not working correctly. I will
-be trying to make my code go red but simply can&amp;rsquo;t make it. Usually, it turns out
-that I&amp;rsquo;m using a function like &lt;a href="https://hexdocs.pm/phoenix/Phoenix.ChannelTest.html#assert_push/3" target="_blank"&gt;assert_push/3&lt;/a&gt;
-that is actually a macro. The way these are written, the function is actually
-doing pattern matching rather than exact checks. For instance:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;expected_payload = %{foo: &amp;quot;bar&amp;quot;}
-assert_push &amp;quot;some_event&amp;quot;, expected_payload
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;is different than:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;expected_payload = %{foo: &amp;quot;bar&amp;quot;}
-assert_push &amp;quot;some_event&amp;quot;, ^expected_payload
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;This is highlighted in the assert_push documentation, but essentially the first example
-doesn&amp;rsquo;t check that the payload is &lt;em&gt;exactly&lt;/em&gt; the expected payload. This means that there could
-be something like a data leak and our test wouldn&amp;rsquo;t catch it! Pattern matching the responses
-can be super useful, but make sure that it&amp;rsquo;s happening when you expect it, and not
-when you don&amp;rsquo;t!&lt;/p&gt;
-
-&lt;p&gt;Thanks for reading, today. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;.&lt;/p&gt;
 </content>
   </entry>

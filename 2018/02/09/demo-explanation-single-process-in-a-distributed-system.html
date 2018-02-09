@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 Days - Demo - Single process in a distributed system</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 Days - Demo - Single process in a distributed system</h1>
+      <p>I&rsquo;m really excited about this post, I&rsquo;ve been thinking about what the demo will
+look like for several days, but it turned out differently than I had in my head.
+I&rsquo;m writing this from 35k feet on my way to vacation; there&rsquo;s nothing better than
+being on a plane to hash out technical problems that have been put off. It would
+be great if the wifi worked though&hellip;</p>
+
+<p>Today&rsquo;s post is going to be a demo + walkthrough of creating a singular process
+chokepoint in a distributed system. That might not be the best way to explain it, but
+I&rsquo;m also struggling to find a better explanation. The end goal is that in a cluster
+of 3 nodes, I can say &ldquo;request id 1&rdquo; and have that go to node 1 every time. I can say
+&ldquo;request id 3&rdquo; and have that go to node 3.</p>
+
+<h2>Code / Demo</h2>
+
+<p>The code is found at <a href="https://www.github.com/sb8244/distributed_process_demo" target="_blank">https://www.github.com/sb8244/distributed_process_demo</a>.
+The repo has instructions for the actual demo and how it should be run.</p>
+
+<p>This code is in the intermediate category, probably. However, it&rsquo;s short and the
+tools used are core for building Elixir apps. Don&rsquo;t be shy to dig in and break it
+locally to really learn what&rsquo;s going on!</p>
+
+<h2>How it works</h2>
+
+<p>Elixir has the ability to connect to other nodes that are accessible on the network. We
+can use this to spawn several local nodes that simulate a networked environment. The
+<a href="https://github.com/sb8244/distributed_process_demo/blob/master/lib/distributed_process.ex#L4" target="_blank"><code>DistributedProcess.connect()</code></a>
+function iterates on up to 5 known node names and connects to them. This is a quick hack to get them connected.</p>
+
+<p>The application creates two different top level supervisors, a <code>Registry</code> which allows
+unique storage of processes (unique by ID here) and a <code>DistributedProcess.Supervisor</code>.</p>
+
+<p>The <a href="https://github.com/sb8244/distributed_process_demo/blob/master/lib/distributed_process/supervisor.ex" target="_blank"><code>DistributedProcess.Supervisor</code></a>
+does the majority of the work for distributing our
+process across the cluster. It accepts an <code>id</code> into the <code>get_worker/1</code> function, and
+uses a modulo operator on the number of nodes to determine which node will be the lucky
+receiver of this request. The size of a node is fairly consistent in practice, so this
+seems acceptable for starters.</p>
+
+<p>When the right node is chosen, the <code>DynamicSupervisor.start_child</code> call creates an instance
+of a <code>DistributedProcess.Worker</code> on the local or remote chosen node. This Worker is setup to
+be unique based on the ID. This is really helpful as it allows future calls to the same ID
+to return the same process.</p>
+
+<p>Once a local or remote pid is returned from the DynamicSupervisor, that pid has a <code>call</code> request
+execute against it. <code>call</code> will return an answer synchronously, which is great for the purposes
+of this demo.</p>
+
+<p>In the <a href="https://github.com/sb8244/distributed_process_demo/blob/master/lib/distributed_process/worker.ex" target="_blank"><code>DistributedProcess.Worker</code></a>,
+the first thing is does is actually tell itself to be destroyed
+in 5 seconds. This is to make the demo interesting, but also simulates the use case of a short
+lived cache.</p>
+
+<p>The <code>handle_call(:request)</code> function in the worker does 2 different things, for 2 different
+function heads. The first is if there is a value in the local state. Then it is simply
+returned as is. The second is if there is no value in the local state. A random 1-1000
+integer is selected and placed in the state, along with the node name. This allows us to see
+that the data is in fact changing every 5 seconds, and where it came from.</p>
+
+<p>All of this is packaged up into 2 top level functions that are called: <code>DistributedProcess.connect()</code>
+and <code>DistributedProcess.request(id)</code>.</p>
+
+<h2>Use Case</h2>
+
+<p>It may be desirable to have a single choke point across a cluster to handle a single
+type of request. For instance, maybe a certain tenant should only execute on a single
+server. This ensures that the requests for that tenant are serial (non-parallel).</p>
+
+<p>My use case is to cache requests to a certain resource/id pair for 30-60 seconds. I want
+to make a single request, then return that value for the lifetime of it. I do not
+want to introduce a DB layer just for this caching, as maintaining that is prone to
+easier logic errors around cache expiration and checking.</p>
+
+<h2>Final Thoughts</h2>
+
+<p>I&rsquo;m most excited about how this code doesn&rsquo;t really feel remote. It can run on a
+local system just as well as in a clustered system, and it scales with cluster size
+with no additional work. That is pretty fun!</p>
+
+<p>I don&rsquo;t know how I would easily test this code. Not having internet led me to not
+test this code today. However, I will probably look into how I can test it and write
+about that in the future. I have had several requests for testing posts, especially
+if they involve complex setups.</p>
+
+<p>I do not know, yet, how I would handle a situation of fetching an array of ids. I would
+want the cache to be distributed, but there is a challenge in not having the same id
+set each time. This sort of breaks the technique, but it doesn&rsquo;t mean it&rsquo;s not valuable
+for single / deterministic ids.</p>
+
+<hr>
+
+<p>Thanks to my co-worker Ben for bouncing this idea around at SalesLoft. We haven&rsquo;t placed
+the technique in production yet, but him and I were both really excited to talk about it.
+I&rsquo;m curious to see how he would approach this type of problem, as I know he had more
+elegant solutions in mind.</p>
+
+<p>Thanks for reading the 8th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+am looking for new topics to write about, so please reach out if there&rsquo;s anything you
+really want to see!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
