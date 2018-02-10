@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 days - How I learned Elixir</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 days - How I learned Elixir</h1>
+      <p>I recently had a request to consider more beginner focused content in this 28 days
+series. This goes really well with one of my goals, which is to get more people
+excited about Elixir and wanting to try it out. Helping out beginners to the
+language is a great way to achieve this goal. I have been reflecting on my
+learning process and considering what worked well and didn&rsquo;t work so well. I do
+recognize that everyone learns differently and values different goals. This is my perspective,
+but another person&rsquo;s might be very different.</p>
+
+<p>When I first started Elixir, I had extensive programming experience, but no real
+experiences with functional programming, nor any BEAM languages. Thus, my first goal
+became just to understand the syntax of the language and learn how the basic constructs
+of the language work (think variables, function definition / usage, etc.) I found that
+the best place for this is in the Elixir documentation itself, namely the
+<a href="https://elixir-lang.org/getting-started/introduction.html" target="_blank">getting started</a> guide.</p>
+
+<h2>Getting Started Guide</h2>
+
+<p>This guide is extensive, which is great for working out most of the finer details of
+the language itself. It breaks down into functional language tutorials, followed by
+tutorials of mix/OTP.</p>
+
+<p>I found the initial exploration of these guides fairly straightforward. Everything would click
+well for me, and examples / changes to them work as expected. This was all great and
+felt like an achievement. However, I wasn&rsquo;t really understanding the content. It took me
+about 4 times through the series before I could actually write any of it from memory. In
+particular, the OTP concepts were much more difficult to understand than I would like
+to admit. I had significant trouble in that area.</p>
+
+<p>Transitioning out of that, I went directly into some real example projects.</p>
+
+<h2>Finding a project</h2>
+
+<p>I knew that the tutorial wasn&rsquo;t fully cutting it for me. I ended up deciding to try to
+write a project that I knew was over my head. I ended up deciding to make a local SMTP trap.
+It would need to listen on a port and then communicate over a very basic SMTP protocol.
+This project was great for me for 2 reasons:</p>
+
+<ol>
+<li>The end goal was significantly over my head from when I started</li>
+<li>The content was beyond &ldquo;normal&rdquo; applications that I write, this made it interesting</li>
+</ol>
+
+<p>Even though I haven&rsquo;t touched the project in a while, I do still keep it on
+<a href="https://github.com/sb8244/elixir-smtp" target="_blank">github</a>.</p>
+
+<p>Throughout this time, I had found people to bounce problems / ideas off of for how I
+would implement things. I believe that finding some support network is crucial for
+seeing these complex problems through.</p>
+
+<h2>Educating at work</h2>
+
+<p>The piece that has had a recent big impact on me and allowed me to solidify my learnings
+even further is switching to the perspective of teacher. At work, people have been
+adopting Elixir and gaining interest. As new people learn the language, they will
+inevitably need help with it. I find that teaching others is usually the most important
+thing for me. This is one where what you put in dictates what you get out.</p>
+
+<h2>Things I would not do differently</h2>
+
+<p>I don&rsquo;t think that I would have looked at paid content to learn the langauge. The tutorials
+are so extensive and written by the same people that made the language that it just seems
+like the right choice to use those tutorials.</p>
+
+<p>In addition, I would not hide any early work from the public or my peers. It
+would be okay for others to know what I was working on it even if it wasn&rsquo;t ready yet, as
+it might encourage them to start up as well.</p>
+
+<h2>Things I would do differently</h2>
+
+<p>On the idea of educating others and doing self-learning through the Elixir tutorial,
+I will say that working through the tutorials with another person would have been a
+huge benefit. That learning/education cycle would have been established much earlier and
+allowed for the faster growth. This is obviously dependent on finding someone who is
+interested in learning Elixir.</p>
+
+<p>I would have jumped into projects at work a bit sooner to understand even more. This
+includes both writing Elixir code myself and reading other code that other&rsquo;s produced
+with significant attention.</p>
+
+<p>I would pick a small codebase from a language that I know well (Ruby) and convert it
+into Elixir. I ended up doing this for a work library recently, and that learning was
+immense. Being a subject matter expert in a certain area means that the act of applying
+that knowledge into another language doesn&rsquo;t involve getting lucky with the project
+selection.</p>
+
+<hr>
+
+<p>No matter who the person is or what their goals are, I would always have one piece
+of advice for someone going down a similar path: &ldquo;just start&rdquo;. Start the process
+and figure out a way to make progress, overcoming challenges that inevitably rise.</p>
+
+<p>Thanks for reading the 9th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+am looking for new topics to write about, so please reach out if there&rsquo;s anything you
+really want to see!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
