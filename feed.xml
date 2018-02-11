@@ -4,10 +4,173 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-10T00:15:00-05:00</updated>
+  <updated>2018-02-10T12:20:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 days - Phoenix websocket dive</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/10/phoenix-websocket-dive.html"/>
+    <id>https://stephenbussey.com/2018/02/10/phoenix-websocket-dive.html</id>
+    <published>2018-02-10T12:20:00-05:00</published>
+    <updated>2018-02-11T00:00:05-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I, and seemingly most people that use them, have a positive view towards Phoenix
+websockets. They are simple to use, scalable, and are stable in production. I have
+some neat content that I want to go over with websockets, but it will be better
+to do a deep dive into how they work first. In particular, the process structure
+and how they scale.&lt;/p&gt;
+
+&lt;p&gt;I have prepared a demo repository that implements a few different websocket concepts.
+The goal of this demo is to reinforce / provide material for this post. You can
+find the repo on &lt;a href="https://github.com/sb8244/websocket-demo/tree/66b7933157be16b4e6d03ab08e21fc9b9841882d" target="_blank"&gt;github&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;The beginning section will start with basics of the websocket, leading into
+how the websocket internals work.&lt;/p&gt;
+
+&lt;h2&gt;Websocket Tests&lt;/h2&gt;
+
+&lt;p&gt;Before going into the code that powers the websocket, let&amp;rsquo;s dive into the code that &lt;em&gt;tests&lt;/em&gt;
+the websocket. &lt;a href="https://hexdocs.pm/phoenix/Phoenix.ChannelTest.html" target="_blank"&gt;Phoenix.ChannelTest&lt;/a&gt; provides
+some helpers that make testing the socket simple. There is some complex setup that goes into the socket,
+but these helpers reduce the complexity.&lt;/p&gt;
+
+&lt;p&gt;The first test that I like to start with is a test for &lt;a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/test/websocket_demo_web/channels/demo_channel_test.exs#L10" target="_blank"&gt;joining a channel&lt;/a&gt;.
+A channel is an abstraction over the websocket to allow for the actual bi-directional communication. When
+we &amp;ldquo;communicate&amp;rdquo; to a socket, we&amp;rsquo;re actually communicating to the channel. It is good practice
+to test that the socket is authenticated to join a particular channel, but this demo does not
+use any authorization.&lt;/p&gt;
+
+&lt;p&gt;One of the very core behaviors of a websocket is responding to a request from the client.
+This is &lt;a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/test/websocket_demo_web/channels/demo_channel_test.exs#L45" target="_blank"&gt;tested&lt;/a&gt;
+using &lt;code&gt;assert_reply&lt;/code&gt;, which ensures that the particular push to the websocket is responded to.
+We will dig into what &amp;ldquo;responding to a push&amp;rdquo; means, below.&lt;/p&gt;
+
+&lt;p&gt;One test that I struggled a bit with was &lt;a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/test/websocket_demo_web/channels/demo_channel_test.exs#L26" target="_blank"&gt;testing that the async timer was enqueued for 5 seconds&lt;/a&gt;.
+I started this test by making the test wait for 5s, which was really not a good strategy. What
+I ended with was keep the timer reference in a state variable, and reading that from the test. It
+might not be great to reach into the internals of a structure in a test, but the alternative is
+waiting a very long time in the test suite. I ended up being okay with this tradeoff for the
+delayed push test, as I could easily make it run in less time by changing from 300ms to
+something else.&lt;/p&gt;
+
+&lt;p&gt;You can find the implementation that satisfies these tests &lt;a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/lib/websocket_demo_web/channels/demo_channel.ex" target="_blank"&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2&gt;Behind the scenes, what is a websocket?&lt;/h2&gt;
+
+&lt;p&gt;The real purpose of this post is to explore what a websocket is. Specifically, what
+is happening when connection, pushes, and responses happen. Let&amp;rsquo;s start by looking at
+the process structure for when a websocket is created. I will do this by opening
+&lt;code&gt;:observer.start&lt;/code&gt; and looking at the difference when a socket is created.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/websocket-dive/one-socket.png" alt="one socket appears in the process tree" /&gt;
+  &lt;div&gt;
+    &lt;small&gt;
+      &lt;i&gt;The rightmost process is the websocket process&lt;/i&gt;
+    &lt;/small&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Above, the pid &lt;0.369.0&gt; is the websocket process. This is possible to visualize by
+clicking on that process and viewing the state. It shows the websocket internal state.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/websocket-dive/369-socket.png" alt="pid 369 appears clearly as the socket" /&gt;
+  &lt;div&gt;
+    &lt;small&gt;
+      &lt;i&gt;It is possible to view the Socket struct in the state information&lt;/i&gt;
+    &lt;/small&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;p&gt;One interesting thing about this pid is that it appears in the state itself, as the
+&lt;code&gt;channel_pid&lt;/code&gt; key of the Elixir.Phoenix.Socket struct. As if seeing the process in
+observer is not enough, this gives the proof that the channel is a process.&lt;/p&gt;
+
+&lt;p&gt;Also in the process state is a second pid called &lt;code&gt;transport_pid&lt;/code&gt;. This process is where
+the actual websocket protocol occurs.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/websocket-dive/transport-process.png" alt="the transport process information" /&gt;
+  &lt;div&gt;
+    &lt;small&gt;
+      &lt;i&gt;The transport process is the parent of the channel process&lt;/i&gt;
+    &lt;/small&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Internally, there is a &lt;a href="https://github.com/phoenixframework/phoenix/blob/master/lib/phoenix/channel/server.ex#L186" target="_blank"&gt;&lt;code&gt;Phoenix.Channel.Server&lt;/code&gt;&lt;/a&gt;
+GenServer which wraps around the behavior of the defined channel. I initially thought
+that saying &lt;code&gt;use Phoenix.Channel&lt;/code&gt; would cause the channel to become a GenServer, but
+that is proved false by seeing that the Phoenix.Channel.Server implementation sets
+&lt;code&gt;channel_pid: self()&lt;/code&gt;. I won&amp;rsquo;t dig into this server implementation today.&lt;/p&gt;
+
+&lt;p&gt;I also won&amp;rsquo;t dig into the cowboy code, but we can see that the actual websocket
+implementation happens at the cowboy level via &lt;a href="https://ninenines.eu/docs/en/cowboy/2.0/manual/cowboy_websocket/" target="_blank"&gt;cowboy_websocket&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Finally, the PubSub.Local0 process is monitoring the channel process. I am going to leave
+this implementation up for another blog post, or as an exercise for you.&lt;/p&gt;
+
+&lt;h2&gt;Websocket messages&lt;/h2&gt;
+
+&lt;p&gt;Google Chrome provides functionality to view what a websocket is doing. This can be
+accessed by finding the websocket in the Network tab. The websocket request has a
+&amp;ldquo;frames&amp;rdquo; inner section. When you view this, you may need to drag down the &amp;ldquo;select a frame&amp;rdquo;
+content to view the frames themselves.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/websocket-dive/frontend-messages.png" alt="frontend message frames" /&gt;
+  &lt;div&gt;
+    &lt;small&gt;
+      &lt;i&gt;The in/out of the client websocket&lt;/i&gt;
+    &lt;/small&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;p&gt;When a message is pushed from the JS client to the backend, it sends the request in the format
+&lt;code&gt;[join_ref, message_ref, topic, message, payload]&lt;/code&gt;. The join&lt;em&gt;ref and message&lt;/em&gt;ref are actually
+really important. These are used in the response (same format as the request) to allow calling
+back to the right function. Phoenix provides the &lt;code&gt;reply&lt;/code&gt; function to reply to a &lt;code&gt;socket_ref&lt;/code&gt;.
+The demo uses this to &lt;a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/lib/websocket_demo_web/channels/demo_channel.ex#L26" target="_blank"&gt;reply asynchronously&lt;/a&gt;
+to requests. Asynchronous replies must happen within the channel timeout period (10s default). A
+timeout event will trigger if it is not in that timeframe. It is possible to override this timeframe
+to be whatever you need for your use case.&lt;/p&gt;
+
+&lt;p&gt;The two refs can be null, as seen for the tick message. This will cause it to
+be a global message handler rather than a local one.&lt;/p&gt;
+
+&lt;h2&gt;What are the benefits of a channel / transport process?&lt;/h2&gt;
+
+&lt;p&gt;The process structure of Phoenix websockets is one of the things that helps make it
+fault tolerant. Let&amp;rsquo;s say that something goes wrong with the channel process and causes
+it to crash. The process will be started back up from the supervisor, causing the
+&lt;code&gt;join&lt;/code&gt; function to be called (triggering any join callbacks on the client). However,
+the channel crash does not cause the client to see any fault in the socket it has.&lt;/p&gt;
+
+&lt;p&gt;If the transport process crashes, the client sees a disconnection and will try to reconnect.
+The channel process also restarts, because it is a child of the transport process. In this
+scenario, the system ends in a stable operating state.&lt;/p&gt;
+
+&lt;p&gt;A benefit of the channel process is that the process can be controlled like any other process.
+It can handle messages via a &lt;code&gt;handle_info&lt;/code&gt; callback, which the demo uses to create a
+tick every 5 seconds. It can also store arbitrary state (best practice is the assigns
+map) which can be used to like any other GenServer state.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;I have a few different things that are more advanced than an intro to websocket post. My
+current ideas are how to debounce a websocket push (push once every X seconds) and also
+what happens to setup the websocket requests.&lt;/p&gt;
+
+&lt;p&gt;Thanks for reading the 10th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
+really want to see!&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 days - How I learned Elixir</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/10/how-i-learned-elixir.html"/>
@@ -551,101 +714,6 @@ just can&amp;rsquo;t figure out.&lt;/p&gt;
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 anticipate a few more posts around networking, such as cookie gotchas, distillery release networking,
 and pg2.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 Days - Sourcing Libraries from Private Github</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/05/sourcing-libraries-from-private-github.html"/>
-    <id>https://stephenbussey.com/2018/02/05/sourcing-libraries-from-private-github.html</id>
-    <published>2018-02-04T19:57:00-05:00</published>
-    <updated>2018-02-04T20:29:42-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;Hex is currently working on &lt;a href="https://hex.pm/docs/private" target="_blank"&gt;private organizations&lt;/a&gt; which
-are in beta. Until the full details of those are public and available, you may find
-yourself needing to source Elixir libraries privately. You may also just desire a quick
-fix and not setting up private packages. Enter git sourced packages.&lt;/p&gt;
-
-&lt;h2&gt;Mix and Git&lt;/h2&gt;
-
-&lt;p&gt;At the simplest form, you can think of git sourced dependencies as a clone of the provided
-repo using system git. In fact, the implementation is
-a &lt;a href="https://github.com/elixir-lang/elixir/blob/f77cc2657cf981fdf819915f1ee15e69c3cd91ad/lib/mix/lib/mix/scm/git.ex#L250" target="_blank"&gt;shell out to git&lt;/a&gt;.
-This means any repo which a system can access will be accessible via git, including
-repos which are locked behind private access.&lt;/p&gt;
-
-&lt;p&gt;I have seen tags work as a good way to mark the versions in the git repo. The form looks
-something like:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;{:my_dependency_name, git: &amp;quot;git@github.com:Organization/repo.git&amp;quot;, tag: &amp;quot;v1.0.0&amp;quot;},
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;The above mix.exs entry will fetch the mix package named &lt;code&gt;:my_dependency_name&lt;/code&gt; from git@github.com:Organization/repo.git,
-commit tagged v1.0.0. &lt;a href="https://help.github.com/articles/connecting-to-github-with-ssh/" target="_blank"&gt;Github SSH&lt;/a&gt; access
-is used due to the repo being &lt;code&gt;git@github.com&lt;/code&gt; format.&lt;/p&gt;
-
-&lt;h2&gt;Trickery with Docker and CI&lt;/h2&gt;
-
-&lt;p&gt;This all works well locally. In fact, just following the standard tutorial will lead to a working
-private dependency, locally. Things get a bit trickier when something like Docker or a build
-server is used to fetch your dependency. In this situation, the SSH key of each system would need
-to be included on Github. Another difficulty is that Docker containers have to have SSH keys added
-to them, they don&amp;rsquo;t come with them standard. All of this leads to another possible solution:
-accessing Github via API keys.&lt;/p&gt;
-
-&lt;h2&gt;API Key Setup&lt;/h2&gt;
-
-&lt;p&gt;&lt;a href="https://github.com/blog/1509-personal-api-tokens" target="_blank"&gt;Github personal access tokens&lt;/a&gt; can be used
-to access certain parts of Github, such as repository access. In order to use one with mix,
-just switch out the git url from &lt;code&gt;git@github.com:Organization/repo.git&lt;/code&gt; to
-&lt;code&gt;https://#{access_token}@github.com/Organization/repo&lt;/code&gt;. With this solution, any access token
-which has read access to the repo will serve as the access into Git.&lt;/p&gt;
-
-&lt;p&gt;There does exist a drawback with this solution, the access token would need to be provided to
-every user of the application. This is non-desirable as the access token should really be kept
-secret, even to the point of being encrypted docker arguments. With a small tweak, it is possible to
-achieve the best of both worlds, SSH locally but access tokens for Docker.&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;defp deps do
-  [
-    {:phoenix, &amp;quot;~&amp;gt; 1.3.0&amp;quot;},
-  ] ++ private_deps(System.get_env(&amp;quot;MIX_GITHUB_ACCESS_TOKEN&amp;quot;))
-end
-
-@my_dependency_version &amp;quot;v1.0.0&amp;quot;
-
-defp private_deps(nil) do
-  [
-    {:my_dependency_name, git: &amp;quot;git@github.com:Organization/repo.git&amp;quot;, tag: @my_dependency_version},
-  ]
-end
-
-defp private_deps(access_token) do
-  [
-    {:my_dependency_name, git: &amp;quot;https://#{access_token}@github.com/Organization/repo&amp;quot;, tag: @my_dependency_version},
-  ]
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;This script will append the private dependencies into the deps list, but do so with
-either SSH or access token access. Dependency versions should always be constant, so
-it is pulled into an attribute.&lt;/p&gt;
-
-&lt;p&gt;One caveat with this approach is that each mix invocation must contain the ENV, not
-just &lt;code&gt;deps.get&lt;/code&gt;. This is due to the mix.lock being checked when mix runs, and the
-correct dependencies are pulled each time through the above code path.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;With the presented approach, there should be little trouble getting private repos
-both locally and in CI, without compromise on security of your keys. If the straight access
-token route is taken, take extra care regarding the permissions of the account behind
-the key.&lt;/p&gt;
-
-&lt;p&gt;Thanks for reading the fourth post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-anticipate the posts to get more and more technical as the time goes on!&lt;/p&gt;
 </content>
   </entry>
 </feed>

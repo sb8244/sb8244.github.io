@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 days - Phoenix websocket dive</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 days - Phoenix websocket dive</h1>
+      <p>I, and seemingly most people that use them, have a positive view towards Phoenix
+websockets. They are simple to use, scalable, and are stable in production. I have
+some neat content that I want to go over with websockets, but it will be better
+to do a deep dive into how they work first. In particular, the process structure
+and how they scale.</p>
+
+<p>I have prepared a demo repository that implements a few different websocket concepts.
+The goal of this demo is to reinforce / provide material for this post. You can
+find the repo on <a href="https://github.com/sb8244/websocket-demo/tree/66b7933157be16b4e6d03ab08e21fc9b9841882d" target="_blank">github</a>.</p>
+
+<p>The beginning section will start with basics of the websocket, leading into
+how the websocket internals work.</p>
+
+<h2>Websocket Tests</h2>
+
+<p>Before going into the code that powers the websocket, let&rsquo;s dive into the code that <em>tests</em>
+the websocket. <a href="https://hexdocs.pm/phoenix/Phoenix.ChannelTest.html" target="_blank">Phoenix.ChannelTest</a> provides
+some helpers that make testing the socket simple. There is some complex setup that goes into the socket,
+but these helpers reduce the complexity.</p>
+
+<p>The first test that I like to start with is a test for <a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/test/websocket_demo_web/channels/demo_channel_test.exs#L10" target="_blank">joining a channel</a>.
+A channel is an abstraction over the websocket to allow for the actual bi-directional communication. When
+we &ldquo;communicate&rdquo; to a socket, we&rsquo;re actually communicating to the channel. It is good practice
+to test that the socket is authenticated to join a particular channel, but this demo does not
+use any authorization.</p>
+
+<p>One of the very core behaviors of a websocket is responding to a request from the client.
+This is <a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/test/websocket_demo_web/channels/demo_channel_test.exs#L45" target="_blank">tested</a>
+using <code>assert_reply</code>, which ensures that the particular push to the websocket is responded to.
+We will dig into what &ldquo;responding to a push&rdquo; means, below.</p>
+
+<p>One test that I struggled a bit with was <a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/test/websocket_demo_web/channels/demo_channel_test.exs#L26" target="_blank">testing that the async timer was enqueued for 5 seconds</a>.
+I started this test by making the test wait for 5s, which was really not a good strategy. What
+I ended with was keep the timer reference in a state variable, and reading that from the test. It
+might not be great to reach into the internals of a structure in a test, but the alternative is
+waiting a very long time in the test suite. I ended up being okay with this tradeoff for the
+delayed push test, as I could easily make it run in less time by changing from 300ms to
+something else.</p>
+
+<p>You can find the implementation that satisfies these tests <a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/lib/websocket_demo_web/channels/demo_channel.ex" target="_blank">here</a>.</p>
+
+<h2>Behind the scenes, what is a websocket?</h2>
+
+<p>The real purpose of this post is to explore what a websocket is. Specifically, what
+is happening when connection, pushes, and responses happen. Let&rsquo;s start by looking at
+the process structure for when a websocket is created. I will do this by opening
+<code>:observer.start</code> and looking at the difference when a socket is created.</p>
+
+<div style="text-align: center">
+  <img src="/images/websocket-dive/one-socket.png" alt="one socket appears in the process tree" />
+  <div>
+    <small>
+      <i>The rightmost process is the websocket process</i>
+    </small>
+  </div>
+</div>
+
+<p>Above, the pid <0.369.0> is the websocket process. This is possible to visualize by
+clicking on that process and viewing the state. It shows the websocket internal state.</p>
+
+<div style="text-align: center">
+  <img src="/images/websocket-dive/369-socket.png" alt="pid 369 appears clearly as the socket" />
+  <div>
+    <small>
+      <i>It is possible to view the Socket struct in the state information</i>
+    </small>
+  </div>
+</div>
+
+<p>One interesting thing about this pid is that it appears in the state itself, as the
+<code>channel_pid</code> key of the Elixir.Phoenix.Socket struct. As if seeing the process in
+observer is not enough, this gives the proof that the channel is a process.</p>
+
+<p>Also in the process state is a second pid called <code>transport_pid</code>. This process is where
+the actual websocket protocol occurs.</p>
+
+<div style="text-align: center">
+  <img src="/images/websocket-dive/transport-process.png" alt="the transport process information" />
+  <div>
+    <small>
+      <i>The transport process is the parent of the channel process</i>
+    </small>
+  </div>
+</div>
+
+<p>Internally, there is a <a href="https://github.com/phoenixframework/phoenix/blob/master/lib/phoenix/channel/server.ex#L186" target="_blank"><code>Phoenix.Channel.Server</code></a>
+GenServer which wraps around the behavior of the defined channel. I initially thought
+that saying <code>use Phoenix.Channel</code> would cause the channel to become a GenServer, but
+that is proved false by seeing that the Phoenix.Channel.Server implementation sets
+<code>channel_pid: self()</code>. I won&rsquo;t dig into this server implementation today.</p>
+
+<p>I also won&rsquo;t dig into the cowboy code, but we can see that the actual websocket
+implementation happens at the cowboy level via <a href="https://ninenines.eu/docs/en/cowboy/2.0/manual/cowboy_websocket/" target="_blank">cowboy_websocket</a>.</p>
+
+<p>Finally, the PubSub.Local0 process is monitoring the channel process. I am going to leave
+this implementation up for another blog post, or as an exercise for you.</p>
+
+<h2>Websocket messages</h2>
+
+<p>Google Chrome provides functionality to view what a websocket is doing. This can be
+accessed by finding the websocket in the Network tab. The websocket request has a
+&ldquo;frames&rdquo; inner section. When you view this, you may need to drag down the &ldquo;select a frame&rdquo;
+content to view the frames themselves.</p>
+
+<div style="text-align: center">
+  <img src="/images/websocket-dive/frontend-messages.png" alt="frontend message frames" />
+  <div>
+    <small>
+      <i>The in/out of the client websocket</i>
+    </small>
+  </div>
+</div>
+
+<p>When a message is pushed from the JS client to the backend, it sends the request in the format
+<code>[join_ref, message_ref, topic, message, payload]</code>. The join<em>ref and message</em>ref are actually
+really important. These are used in the response (same format as the request) to allow calling
+back to the right function. Phoenix provides the <code>reply</code> function to reply to a <code>socket_ref</code>.
+The demo uses this to <a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/lib/websocket_demo_web/channels/demo_channel.ex#L26" target="_blank">reply asynchronously</a>
+to requests. Asynchronous replies must happen within the channel timeout period (10s default). A
+timeout event will trigger if it is not in that timeframe. It is possible to override this timeframe
+to be whatever you need for your use case.</p>
+
+<p>The two refs can be null, as seen for the tick message. This will cause it to
+be a global message handler rather than a local one.</p>
+
+<h2>What are the benefits of a channel / transport process?</h2>
+
+<p>The process structure of Phoenix websockets is one of the things that helps make it
+fault tolerant. Let&rsquo;s say that something goes wrong with the channel process and causes
+it to crash. The process will be started back up from the supervisor, causing the
+<code>join</code> function to be called (triggering any join callbacks on the client). However,
+the channel crash does not cause the client to see any fault in the socket it has.</p>
+
+<p>If the transport process crashes, the client sees a disconnection and will try to reconnect.
+The channel process also restarts, because it is a child of the transport process. In this
+scenario, the system ends in a stable operating state.</p>
+
+<p>A benefit of the channel process is that the process can be controlled like any other process.
+It can handle messages via a <code>handle_info</code> callback, which the demo uses to create a
+tick every 5 seconds. It can also store arbitrary state (best practice is the assigns
+map) which can be used to like any other GenServer state.</p>
+
+<hr>
+
+<p>I have a few different things that are more advanced than an intro to websocket post. My
+current ideas are how to debounce a websocket push (push once every X seconds) and also
+what happens to setup the websocket requests.</p>
+
+<p>Thanks for reading the 10th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+am looking for new topics to write about, so please reach out if there&rsquo;s anything you
+really want to see!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
