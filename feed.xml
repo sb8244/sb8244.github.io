@@ -13,7 +13,7 @@
     <link rel="alternate" href="https://stephenbussey.com/2018/02/12/phoenix-websocket-http-breakdown.html"/>
     <id>https://stephenbussey.com/2018/02/12/phoenix-websocket-http-breakdown.html</id>
     <published>2018-02-11T20:01:00-05:00</published>
-    <updated>2018-02-11T20:24:04-05:00</updated>
+    <updated>2018-02-11T20:26:52-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -47,7 +47,7 @@ attribute is exposed as &lt;code&gt;__sockets__/0&lt;/code&gt; on the endpoint i
 &lt;p&gt;Next up, we can look at where &lt;code&gt;__sockets__&lt;/code&gt; is referenced in the Phoenix codebase:&lt;/p&gt;
 
 &lt;div style="text-align: center"&gt;
-  &lt;img src="/images/socket-http/__socket__search.png" alt="__sockets__ usage from Github" /&gt;
+  &lt;img src="/images/socket-http/socket-search.png" alt="__sockets__ usage from Github" /&gt;
   &lt;div&gt;
     &lt;small&gt;
       &lt;i&gt;There are only 2 users of the sockets function&lt;/i&gt;
