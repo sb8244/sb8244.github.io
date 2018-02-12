@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 days - Phoenix websocket HTTP breakdown</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 days - Phoenix websocket HTTP breakdown</h1>
+      <p>This post is coming right on the heels of a <a href="/2018/02/10/phoenix-websocket-dive.html" target="_blank">websocket post</a> written yesterday.
+While that post handled what a channel looks like when Phoenix websockets are used,
+it doesn&rsquo;t cover much of how Phoenix operates under the hood.</p>
+
+<p>This topic came up as I was trying to figure out how to put a plug in front of
+the websocket connection, in order to have custom origin validation code. I was
+surprised that I cannot put a plug in front of it, as it&rsquo;s not part of the typical
+Phoenix path.</p>
+
+<h2>Websocket HTTP Request</h2>
+
+<p>When a client connects to a websocket server, the initial connection is
+done as http, followed by protocol switching to ws (or https/wss). This web request
+does the <a href="https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers#The_WebSocket_Handshake" target="_blank">websocket handshake</a>
+and ends with a connected websocket. It is possible to make this request yourself using curl (right click websocket request
+in Chrome and &ldquo;copy as curl&rdquo;), although you will end up with a 400 bad request.</p>
+
+<p>As this is just a web request, we can be pretty confident that Phoenix is going to handle
+it. My first thought was to figure out what the <code>socket</code> macro in Phoenix.Endpoint
+does.</p>
+
+<h2>Phoenix Setup</h2>
+
+<p><a href="https://github.com/phoenixframework/phoenix/blob/7c67edeec4e877b71a54606db33fa650e9819ca7/lib/phoenix/endpoint.ex#L754" target="_blank"><code>Phoenix.Endpoint</code></a>
+exposes a socket macro that adds the path and module to a module attribute. This
+attribute is exposed as <code>__sockets__/0</code> on the endpoint implementation.</p>
+
+<p>Next up, we can look at where <code>__sockets__</code> is referenced in the Phoenix codebase:</p>
+
+<div style="text-align: center">
+  <img src="/images/socket-http/__socket__search.png" alt="__sockets__ usage from Github" />
+  <div>
+    <small>
+      <i>There are only 2 users of the sockets function</i>
+    </small>
+  </div>
+</div>
+
+<p>I checked my version of cowboy in mix.lock to find out that I&rsquo;m on cowboy 1. So let&rsquo;s
+dive into that code.</p>
+
+<p>The <a href="https://github.com/phoenixframework/phoenix/blob/78bb8f1e5b5fab094a6fe4d8bdc3ce7cd4a55da2/lib/phoenix/endpoint/cowboy_handler.ex#L89" target="_blank">cowboy_handler</a>
+is where the actual cowboy server gets started up. It&rsquo;s important to pass in the right
+dispatches, which execute the web logic. We can see that a custom socket based dispatch
+is created for every socket defined in the endpoint. Here is what my dispatch looked like
+for the repo in the previous post:</p>
+
+<pre><code>[
+  {&quot;/socket/websocket&quot;, Phoenix.Endpoint.CowboyWebSocket,
+   {Phoenix.Transports.WebSocket,
+    {WebsocketDemoWeb.Endpoint, WebsocketDemoWeb.DemoSocket, :websocket}}}
+]
+</code></pre>
+
+<p>Finally, the <a href="https://github.com/phoenixframework/phoenix/blob/78bb8f1e5b5fab094a6fe4d8bdc3ce7cd4a55da2/lib/phoenix/endpoint/cowboy_websocket.ex#L9" target="_blank"><code>CowboyWebSocket</code></a>
+handles the actual websocket request, utilizing the <code>Phoenix.Transports.Websocket</code> module
+to do the heavy lifting of deciding if the connection is allowed or not.</p>
+
+<p>The <a href="https://github.com/phoenixframework/phoenix/blob/78bb8f1e5b5fab094a6fe4d8bdc3ce7cd4a55da2/lib/phoenix/transports/websocket.ex#L85" target="_blank"><code>Transports.Websocket</code></a>
+module is what checks the origin and decides whether the websocket is allowed or
+not. All of the code up until this point has been entirely within Phoenix&rsquo;s framework,
+without any clear cut place to hook into. Thus, I came to the conclusion that
+I can&rsquo;t just shimmy some new <code>check_origin</code> logic into the code path. Ah well,
+at least there was good learning.</p>
+
+<hr>
+
+<p>Thanks for reading the 11th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+am looking for new topics to write about, so please reach out if there&rsquo;s anything you
+really want to see!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>

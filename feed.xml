@@ -4,10 +4,92 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-10T12:20:00-05:00</updated>
+  <updated>2018-02-11T20:01:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 days - Phoenix websocket HTTP breakdown</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/12/phoenix-websocket-http-breakdown.html"/>
+    <id>https://stephenbussey.com/2018/02/12/phoenix-websocket-http-breakdown.html</id>
+    <published>2018-02-11T20:01:00-05:00</published>
+    <updated>2018-02-11T20:24:04-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;This post is coming right on the heels of a &lt;a href="/2018/02/10/phoenix-websocket-dive.html" target="_blank"&gt;websocket post&lt;/a&gt; written yesterday.
+While that post handled what a channel looks like when Phoenix websockets are used,
+it doesn&amp;rsquo;t cover much of how Phoenix operates under the hood.&lt;/p&gt;
+
+&lt;p&gt;This topic came up as I was trying to figure out how to put a plug in front of
+the websocket connection, in order to have custom origin validation code. I was
+surprised that I cannot put a plug in front of it, as it&amp;rsquo;s not part of the typical
+Phoenix path.&lt;/p&gt;
+
+&lt;h2&gt;Websocket HTTP Request&lt;/h2&gt;
+
+&lt;p&gt;When a client connects to a websocket server, the initial connection is
+done as http, followed by protocol switching to ws (or https/wss). This web request
+does the &lt;a href="https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers#The_WebSocket_Handshake" target="_blank"&gt;websocket handshake&lt;/a&gt;
+and ends with a connected websocket. It is possible to make this request yourself using curl (right click websocket request
+in Chrome and &amp;ldquo;copy as curl&amp;rdquo;), although you will end up with a 400 bad request.&lt;/p&gt;
+
+&lt;p&gt;As this is just a web request, we can be pretty confident that Phoenix is going to handle
+it. My first thought was to figure out what the &lt;code&gt;socket&lt;/code&gt; macro in Phoenix.Endpoint
+does.&lt;/p&gt;
+
+&lt;h2&gt;Phoenix Setup&lt;/h2&gt;
+
+&lt;p&gt;&lt;a href="https://github.com/phoenixframework/phoenix/blob/7c67edeec4e877b71a54606db33fa650e9819ca7/lib/phoenix/endpoint.ex#L754" target="_blank"&gt;&lt;code&gt;Phoenix.Endpoint&lt;/code&gt;&lt;/a&gt;
+exposes a socket macro that adds the path and module to a module attribute. This
+attribute is exposed as &lt;code&gt;__sockets__/0&lt;/code&gt; on the endpoint implementation.&lt;/p&gt;
+
+&lt;p&gt;Next up, we can look at where &lt;code&gt;__sockets__&lt;/code&gt; is referenced in the Phoenix codebase:&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/socket-http/__socket__search.png" alt="__sockets__ usage from Github" /&gt;
+  &lt;div&gt;
+    &lt;small&gt;
+      &lt;i&gt;There are only 2 users of the sockets function&lt;/i&gt;
+    &lt;/small&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;p&gt;I checked my version of cowboy in mix.lock to find out that I&amp;rsquo;m on cowboy 1. So let&amp;rsquo;s
+dive into that code.&lt;/p&gt;
+
+&lt;p&gt;The &lt;a href="https://github.com/phoenixframework/phoenix/blob/78bb8f1e5b5fab094a6fe4d8bdc3ce7cd4a55da2/lib/phoenix/endpoint/cowboy_handler.ex#L89" target="_blank"&gt;cowboy_handler&lt;/a&gt;
+is where the actual cowboy server gets started up. It&amp;rsquo;s important to pass in the right
+dispatches, which execute the web logic. We can see that a custom socket based dispatch
+is created for every socket defined in the endpoint. Here is what my dispatch looked like
+for the repo in the previous post:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;[
+  {&amp;quot;/socket/websocket&amp;quot;, Phoenix.Endpoint.CowboyWebSocket,
+   {Phoenix.Transports.WebSocket,
+    {WebsocketDemoWeb.Endpoint, WebsocketDemoWeb.DemoSocket, :websocket}}}
+]
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Finally, the &lt;a href="https://github.com/phoenixframework/phoenix/blob/78bb8f1e5b5fab094a6fe4d8bdc3ce7cd4a55da2/lib/phoenix/endpoint/cowboy_websocket.ex#L9" target="_blank"&gt;&lt;code&gt;CowboyWebSocket&lt;/code&gt;&lt;/a&gt;
+handles the actual websocket request, utilizing the &lt;code&gt;Phoenix.Transports.Websocket&lt;/code&gt; module
+to do the heavy lifting of deciding if the connection is allowed or not.&lt;/p&gt;
+
+&lt;p&gt;The &lt;a href="https://github.com/phoenixframework/phoenix/blob/78bb8f1e5b5fab094a6fe4d8bdc3ce7cd4a55da2/lib/phoenix/transports/websocket.ex#L85" target="_blank"&gt;&lt;code&gt;Transports.Websocket&lt;/code&gt;&lt;/a&gt;
+module is what checks the origin and decides whether the websocket is allowed or
+not. All of the code up until this point has been entirely within Phoenix&amp;rsquo;s framework,
+without any clear cut place to hook into. Thus, I came to the conclusion that
+I can&amp;rsquo;t just shimmy some new &lt;code&gt;check_origin&lt;/code&gt; logic into the code path. Ah well,
+at least there was good learning.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;Thanks for reading the 11th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
+really want to see!&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 days - Phoenix websocket dive</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/10/phoenix-websocket-dive.html"/>
@@ -578,139 +660,6 @@ kubernetes. It is great to see that there is no hacky implementations under the 
 simply easy to follow and debug Elixir code, falling back on known erlang libraries.&lt;/p&gt;
 
 &lt;p&gt;Thanks for reading the 6th post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-anticipate a few more posts around networking, such as cookie gotchas, distillery release networking,
-and pg2.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 Days - Elixir Node Networking Basics</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/06/elixir-node-networking-basics.html"/>
-    <id>https://stephenbussey.com/2018/02/06/elixir-node-networking-basics.html</id>
-    <published>2018-02-05T21:08:00-05:00</published>
-    <updated>2018-02-06T00:17:22-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;One of my favorite points in Elixir, some form of magic perhaps, is how simple
-distributed networking can be. The language itself seems to make establishing
-networked nodes and sending messages a pain-free exercise. While breaking down
-networking techniques is more than a single post, I am going to look into some of
-the basics of networking in Elixir. Specifically, what happens when we connect
-nodes together?&lt;/p&gt;
-
-&lt;h2&gt;Nodes in Elixir&lt;/h2&gt;
-
-&lt;p&gt;In Elixir, a &lt;code&gt;Node&lt;/code&gt; could be defined as a single running instance. There can be
-multiple nodes running on a single machine. Let&amp;rsquo;s use this to take a look at some
-basics of node communication, before diving into what is going on.&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;# In shell 1
-iex --name test@127.0.0.1
-
-# In shell 2
-iex --name test2@127.0.0.1
-
-# In shell 1
-Node.self() # :&amp;quot;test@127.0.0.1&amp;quot;
-Node.list() # []
-Node.connect(:&amp;quot;test2@127.0.0.1&amp;quot;) # true
-Node.list() # [:&amp;quot;test2@127.0.0.1&amp;quot;]
-
-# In shell 2
-Node.list() # [:&amp;quot;test@127.0.0.1&amp;quot;]
-
-# Leave open
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;From the above interactive example, it&amp;rsquo;s possible to see that 2 nodes are initially
-started, with a particular name of &lt;code&gt;test@127.0.0.1&lt;/code&gt; or test2. These nodes start as
-disconnected, but can be manually connected. Once connected, both nodes are aware of the
-other node&amp;rsquo;s existence.&lt;/p&gt;
-
-&lt;p&gt;Finally, we can test out sending a message in the above processes:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;# In shell 1
-Node.spawn(:&amp;quot;test2@127.0.0.1&amp;quot;, fn -&amp;gt; IO.inspect(Node.self()) end)
-#PID&amp;lt;13084.113.0&amp;gt;
-:&amp;quot;test2@127.0.0.1&amp;quot;
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;In the above example, a function is set to be executed on &lt;code&gt;:&amp;quot;test2@127.0.01&amp;quot;&lt;/code&gt;. We can see
-that the result of the execution is a remote pid (doesn&amp;rsquo;t start with 0) as well the output
-containing the node&amp;rsquo;s name.&lt;/p&gt;
-
-&lt;p&gt;The Node module contains lots of interesting tidbits that are actually implemented pretty
-thin on top of erlang modules. This post won&amp;rsquo;t go into the ins and outs of node communication,
-although it&amp;rsquo;s suffice to say that communication is generally done in better ways than
-spawning functions between the nodes.&lt;/p&gt;
-
-&lt;h2&gt;Diving into a connection&lt;/h2&gt;
-
-&lt;p&gt;&lt;a href="https://github.com/elixir-lang/elixir/blob/v1.6.1/lib/elixir/lib/node.ex#L150" target="_blank"&gt;Node.connect&lt;/a&gt; provides
-a really simple 1-liner over &lt;code&gt;:net_kernel.connect_node/1&lt;/code&gt;. Let&amp;rsquo;s dig into this function and
-what some ramifications of using it are.&lt;/p&gt;
-
-&lt;p&gt;Deep inside of the erlang OTP libraries, we start to see some interesting code in connection.
-Specifically, there is &lt;a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L313" target="_blank"&gt;code&lt;/a&gt;
-to handle automatic &amp;ldquo;magical&amp;rdquo; connection between nodes, vs more explicit connection dependencies.&lt;/p&gt;
-
-&lt;p&gt;&lt;a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L342" target="_blank"&gt;Digging even further&lt;/a&gt;,
-we discover that the &lt;code&gt;net_kernel&lt;/code&gt; symbol is actually a process on the system. Running &lt;code&gt;Process.whereis(:net_kernel)&lt;/code&gt;
-will return the pid of this net_kernel process.&lt;/p&gt;
-
-&lt;p&gt;&lt;a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L422" target="_blank"&gt;The first time that a Node is connected to&lt;/a&gt;,
-that connection is not present in the ets lookup table. This leads to setup being called and
-initializing that connection.&lt;/p&gt;
-
-&lt;p&gt;By digging into &lt;code&gt;Process.whereis(:net_kernel) |&amp;gt; :sys.get_state()&lt;/code&gt;, it&amp;rsquo;s possible to see that
-there is a structure like:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;{:listen, #Port&amp;lt;0.609&amp;gt;, #PID&amp;lt;0.49.0&amp;gt;,
-    {:net_address, {{0, 0, 0, 0}, 56479}, &amp;#39;Steves-MBP&amp;#39;, :tcp, :inet},
-    :inet_tcp_dist}
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;This state is &lt;a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/net_kernel.erl#L113" target="_blank"&gt;documented&lt;/a&gt;
-and helps to let us trace the module that will actually connect our nodes together. Finally, we
-are able to track down the &lt;a href="https://github.com/erlang/otp/blob/1526eaead833b3bdcd3555a12e2af62c359e7868/lib/kernel/src/inet_tcp_dist.erl#L296" target="_blank"&gt;setup code&lt;/a&gt;
-that is creating the TCP socket between the nodes.&lt;/p&gt;
-
-&lt;p&gt;One small caveat of connecting to nodes is that &amp;ldquo;cookies&amp;rdquo; have to match up. This is
-essentially an atom that is initialized on boot and read from &lt;code&gt;~/.erlang.cookie&lt;/code&gt;. Finding
-this was pretty challenging in erlang, but I traced it back to
-&lt;a href="https://github.com/erlang/otp/blob/d99803e7625e474dee40f0dfebf2b8092add0336/lib/kernel/src/dist_util.erl#L216" target="_blank"&gt;dist_util&lt;/a&gt;
-module. The code above (even if you can&amp;rsquo;t read erlang) is doing some interesting challenge/reply
-protocol to ensure that the nodes are allowed to talk to each other.&lt;/p&gt;
-
-&lt;h2&gt;After the connection&lt;/h2&gt;
-
-&lt;p&gt;Of course, connecting via TCP here is just the beginning. There is significantly more
-at play, cookies to authenticate nodes and heartbeats to ensure connectivity between nodes
-for starters. The &lt;a href="http://learnyousomeerlang.com/distribunomicon" target="_blank"&gt;distributed erlang guide&lt;/a&gt; from
-learnyousomeerlang.com goes over some of these concepts in detail. I&amp;rsquo;ll be tackling them
-in a future post as well.&lt;/p&gt;
-
-&lt;h2&gt;Addendum&lt;/h2&gt;
-
-&lt;p&gt;It was asked in the Elixir slack group if it&amp;rsquo;s possible to customize the distribution mechanism
-from TCP/IP to something else. It is! It&amp;rsquo;s fairly involved C code, but there is &lt;a href="http://erlang.org/doc/apps/erts/alt_dist.html" target="_blank"&gt;an example&lt;/a&gt;
-walking through a OS socket level distribution.&lt;/p&gt;
-
-&lt;p&gt;In addition, some other drivers are provided out of the box, such as a
-&lt;a href="http://erlang.org/doc/apps/ssl/ssl_distribution.html" target="_blank"&gt;SSL driver&lt;/a&gt; for communicating
-over SSL.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;I don&amp;rsquo;t really read erlang code, so this post was very interesting today. However, a lot
-of great things can be learned from digging into the erlang code and module documentation
-and not relying solely on Elixir docs. For instance, the documentation for node networking
-brings up great points around security and TLS node communication. Dive into the docs and
-see what you go from there; it might be useful one day when there&amp;rsquo;s a problem that you
-just can&amp;rsquo;t figure out.&lt;/p&gt;
-
-&lt;p&gt;Thanks for reading the 5th post in my 28 days of Elixir. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 anticipate a few more posts around networking, such as cookie gotchas, distillery release networking,
 and pg2.&lt;/p&gt;
