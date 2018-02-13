@@ -4,10 +4,86 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-11T20:01:00-05:00</updated>
+  <updated>2018-02-12T23:09:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 Days - Debounce websocket messages</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/13/debounce-websocket-messages.html"/>
+    <id>https://stephenbussey.com/2018/02/13/debounce-websocket-messages.html</id>
+    <published>2018-02-12T23:09:00-05:00</published>
+    <updated>2018-02-12T23:53:43-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;Today I&amp;rsquo;ll finish up the current string of websocket content that I have planned.
+I&amp;rsquo;ll be sharing a really neat technique that I have used in situations where I want
+to keep a frontend up to date with live content, but the live content comes in
+much faster than I want to update. In my situation, I desired a technique to
+&amp;ldquo;debounce&amp;rdquo; these messages. That is, I want to trigger 1 message every N seconds.&lt;/p&gt;
+
+&lt;p&gt;Special thanks to my co-worker &lt;a href="https://github.com/sionide21" target="_blank"&gt;Ben Olive&lt;/a&gt; for the
+idea of this technique. He is the brains behind a lot of cool techniques that have
+proven to me the power of Elixir.&lt;/p&gt;
+
+&lt;h2&gt;Debouncing&lt;/h2&gt;
+
+&lt;p&gt;Debouncing is a technique to limit the amount of requests made to a function in a
+limited amount of time. What I&amp;rsquo;ll demonstrate is leading edge debouncing. This means
+that the first message will immediately trigger, and every future event will occur
+5s after the previous message. This all &amp;ldquo;resets&amp;rdquo; after 5 seconds without messages.&lt;/p&gt;
+
+&lt;p&gt;Here is a state diagram that Ben had put together awhile ago to demonstate how this
+can work:&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/debounce-websockets/diagram.png" alt="State machine for debouncing" /&gt;
+  &lt;div&gt;
+    &lt;small&gt;
+      &lt;i&gt;The state machine for debouncing&lt;/i&gt;
+    &lt;/small&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The starting state is &amp;ldquo;idle&amp;rdquo;. When the function is called, the state enters &amp;ldquo;debouncing&amp;rdquo;, and
+also applies the function. If the function is called from this state, it enters a &amp;ldquo;called&amp;rdquo; state,
+but does not apply the function. From here, a X-second timeout will switch the state and
+apply the function. When the &amp;ldquo;debouncing&amp;rdquo; state is exited from a timeout, the entire
+state machine resets back to the initial.&lt;/p&gt;
+
+&lt;h2&gt;Applied to Websockets&lt;/h2&gt;
+
+&lt;p&gt;Now that there is a state diagram which represents what we need to code, the act of
+coding it and knowing it is correct becomes much simpler. I personally had a ton of
+trouble understanding what &amp;ldquo;debouncing&amp;rdquo; actually is, and having the reference made
+implementation much simpler.&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;ve put an entire implementation commit on &lt;a href="https://github.com/sb8244/websocket-demo/commit/18dac56092ed6f495270a5316d246c655dd88d90" target="_blank"&gt;github&lt;/a&gt;.
+There is a good bit of code in such a simple concept, but each bit of code is fairly
+small and relates to a step of the state machine diagram. Tests also accompany the
+implementation.&lt;/p&gt;
+
+&lt;p&gt;I don&amp;rsquo;t think that going in detail on the implementation will be much value, it is
+fairly self contained. However, some of the testing is actually more interesting than
+the debounce code. In particular, you&amp;rsquo;ll notice that I decided to setup the state machine
+by calling &lt;code&gt;broadcast_from!&lt;/code&gt; rather than changing the state manually. I feel that this
+gives the best &amp;ldquo;end usage&amp;rdquo; representation of the code, rather than an artifical test setup.
+In addition, I do lay back on reading the socket state to get the updated assignment
+values. There may be a better way to do this.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;I hope you find this technique useful if you run into a similar use case. There may
+even be opportunity to turn something like this into a library which can be used
+more general purpose.&lt;/p&gt;
+
+&lt;p&gt;Thanks for reading the 12th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
+really want to see!&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 days - Phoenix websocket HTTP breakdown</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/12/phoenix-websocket-http-breakdown.html"/>
@@ -554,115 +630,6 @@ Elixir code that I use daily.&lt;/p&gt;
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 am leaving for vacation tomorrow. I&amp;rsquo;m excited for the time to reflect on interesting topics and
 to have more time in the evening to write about them&amp;hellip;hopefully. Cheers!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 Days - Peerage Deep Dive</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/07/peerage-deep-dive.html"/>
-    <id>https://stephenbussey.com/2018/02/07/peerage-deep-dive.html</id>
-    <published>2018-02-06T21:10:00-05:00</published>
-    <updated>2018-02-06T21:32:17-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I am going to continue off of &lt;a href="/2018/02/06/elixir-node-networking-basics.html" target="_blank"&gt;yesterdays&amp;rsquo; post&lt;/a&gt;
-in order to look at how the &lt;a href="https://github.com/mrluc/peerage" target="_blank"&gt;Peerage&lt;/a&gt; library works. Peerage
-is a pretty awesome library which makes Node discovery in distributed environments very easy.&lt;/p&gt;
-
-&lt;h2&gt;Peerage Strategies&lt;/h2&gt;
-
-&lt;p&gt;Peerage offers &lt;a href="https://github.com/mrluc/peerage#usage" target="_blank"&gt;several strategies&lt;/a&gt; which allow
-for Node discovery. The most common one for me has been DNS, but the others can be just
-as valuable depending on environment.&lt;/p&gt;
-
-&lt;p&gt;At the &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/self.ex" target="_blank"&gt;simplest&lt;/a&gt;, a
-Peerage discovery service must respond to the &lt;code&gt;poll()&lt;/code&gt; function. This is a pretty small
-interface, which would make creating new discovery strategies very easy. The
-&lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/self.ex" target="_blank"&gt;self&lt;/a&gt; strategy only
-returns the current node in a List, which is essentially a no-op.&lt;/p&gt;
-
-&lt;p&gt;We can look a little deeper at something that might do some actual connectivity,
-the &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/list.ex#L28" target="_blank"&gt;list&lt;/a&gt; strategy.
-As we can see from this code, it&amp;rsquo;s really not complex. The application is setup with a list
-of Node symbols, and those will try to connect through this strategy.&lt;/p&gt;
-
-&lt;p&gt;Now we can finally get into some real work, with the &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/udp.ex#L45" target="_blank"&gt;UDP strategy&lt;/a&gt;.
-UDP can be used to connect in a situation where nodes are on the same network, but are generally
-unware of what other nodes are on the network. Digging into the UDP strategy, we can see that
-UDP messages are sent over the network, and include the format &lt;code&gt;&amp;quot;Peer#{node()}&amp;quot;&lt;/code&gt;:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;@doc &amp;quot;Broadcast our node name via UDP every 3-7 seconds&amp;quot;
-def handle_info(:broadcast, state = %{conn: {addr, port, sock}}) do
-  :ok = :gen_udp.send(sock, addr, port, [&amp;quot;Peer:#{ node() }&amp;quot;])
-  Process.send_after(self(), :broadcast, :rand.uniform(4_000) + 3_000)
-  {:noreply, state}
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;When a UDP packet comes in, matching the format, that node is logged into state.&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;@doc &amp;quot;Handle UDP packet. If it&amp;#39;s a node name broadcast, adds to `state.seen`.&amp;quot;
-def handle_info({:udp,sock,_,_, &amp;quot;Peer:&amp;quot; &amp;lt;&amp;gt; name}, state = %{seen: ms}) do
-  Logger.debug &amp;quot;  -&amp;gt; Peerage.Via.Udp sees: #{ name }&amp;quot;
-  :inet.setopts(sock, active: 1)
-  {:noreply, %{state | seen: ms |&amp;gt; MapSet.put(name |&amp;gt; String.to_atom)}}
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Finally, &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/udp.ex#L52" target="_blank"&gt;this state is returned&lt;/a&gt; synchronously
-when requested by the poller we saw previously.&lt;/p&gt;
-
-&lt;p&gt;I really like this general approach because we can see that there isn&amp;rsquo;t real magic going on. Nodes
-are broadcasting their name over the UDP connectionless protocol, and then letting the polling
-service take over from there (which will be explained below).&lt;/p&gt;
-
-&lt;p&gt;Finally, the &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/dns.ex#L32" target="_blank"&gt;DNS strategy&lt;/a&gt;, can
-be used in multi-node situations where IPs are mapped to a DNS record. In kubernetes, for example,
-the nodes can be mapped into a headless service and then resolved from there. The poll mechanism
-of the DNS strategy is even simpler than UDP. Simply take the provided DNS name, look it up
-using &lt;code&gt;:inet_res.lookup(&amp;#39;domain.com&amp;#39;, :in, :a)&lt;/code&gt;, and then &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/dns.ex#L38" target="_blank"&gt;turn the provided IPs into connectable
-names&lt;/a&gt;.&lt;/p&gt;
-
-&lt;h2&gt;Connection&lt;/h2&gt;
-
-&lt;p&gt;My favorite part of peerage, by far, is how simple the &lt;a href="https://github.com/mrluc/peerage/blob/master/lib/peerage/server.ex" target="_blank"&gt;server&lt;/a&gt;
-is that actually connects nodes together. The polling code triggers the &lt;code&gt;discover&lt;/code&gt; method
-and reschedules for some interval in the future. If you haven&amp;rsquo;t seen it before, the
-&lt;code&gt;Process.send_after&lt;/code&gt; line here is very common for creating gen servers which do some
-regular interval&amp;rsquo;d work.&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;def handle_info(:poll, state) do
-  discover()
-  Process.send_after(self(), :poll, interval() * 1000)
-  {:noreply, state}
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Finally, the real simplicity comes out with node connections:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;defp discover do
-  poll()
-  |&amp;gt; only_fresh_node_names
-  |&amp;gt; Enum.map(&amp;amp;([&amp;amp;1, Node.connect(&amp;amp;1)]))
-  |&amp;gt; log_results
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;The nodes are polled using the mechanisms we saw previously, then compared against currently
-connected nodes. &lt;code&gt;Node.connect&lt;/code&gt; is then called on the symbol provided by the providers, and attempted
-to connect to. When a Node connects, erlang handles all of the security and heartbeat, as
-laid out in the &lt;a href="/2018/02/06/elixir-node-networking-basics.html" target="_blank"&gt;previous post&lt;/a&gt;.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;This simple and elegant library has been a cornerstone for me connecting nodes together in
-kubernetes. It is great to see that there is no hacky implementations under the covers. It is
-simply easy to follow and debug Elixir code, falling back on known erlang libraries.&lt;/p&gt;
-
-&lt;p&gt;Thanks for reading the 6th post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-anticipate a few more posts around networking, such as cookie gotchas, distillery release networking,
-and pg2.&lt;/p&gt;
 </content>
   </entry>
 </feed>

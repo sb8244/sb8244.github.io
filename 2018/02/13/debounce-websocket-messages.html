@@ -1,0 +1,128 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 Days - Debounce websocket messages</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 Days - Debounce websocket messages</h1>
+      <p>Today I&rsquo;ll finish up the current string of websocket content that I have planned.
+I&rsquo;ll be sharing a really neat technique that I have used in situations where I want
+to keep a frontend up to date with live content, but the live content comes in
+much faster than I want to update. In my situation, I desired a technique to
+&ldquo;debounce&rdquo; these messages. That is, I want to trigger 1 message every N seconds.</p>
+
+<p>Special thanks to my co-worker <a href="https://github.com/sionide21" target="_blank">Ben Olive</a> for the
+idea of this technique. He is the brains behind a lot of cool techniques that have
+proven to me the power of Elixir.</p>
+
+<h2>Debouncing</h2>
+
+<p>Debouncing is a technique to limit the amount of requests made to a function in a
+limited amount of time. What I&rsquo;ll demonstrate is leading edge debouncing. This means
+that the first message will immediately trigger, and every future event will occur
+5s after the previous message. This all &ldquo;resets&rdquo; after 5 seconds without messages.</p>
+
+<p>Here is a state diagram that Ben had put together awhile ago to demonstate how this
+can work:</p>
+
+<div style="text-align: center">
+  <img src="/images/debounce-websockets/diagram.png" alt="State machine for debouncing" />
+  <div>
+    <small>
+      <i>The state machine for debouncing</i>
+    </small>
+  </div>
+</div>
+
+<p>The starting state is &ldquo;idle&rdquo;. When the function is called, the state enters &ldquo;debouncing&rdquo;, and
+also applies the function. If the function is called from this state, it enters a &ldquo;called&rdquo; state,
+but does not apply the function. From here, a X-second timeout will switch the state and
+apply the function. When the &ldquo;debouncing&rdquo; state is exited from a timeout, the entire
+state machine resets back to the initial.</p>
+
+<h2>Applied to Websockets</h2>
+
+<p>Now that there is a state diagram which represents what we need to code, the act of
+coding it and knowing it is correct becomes much simpler. I personally had a ton of
+trouble understanding what &ldquo;debouncing&rdquo; actually is, and having the reference made
+implementation much simpler.</p>
+
+<p>I&rsquo;ve put an entire implementation commit on <a href="https://github.com/sb8244/websocket-demo/commit/18dac56092ed6f495270a5316d246c655dd88d90" target="_blank">github</a>.
+There is a good bit of code in such a simple concept, but each bit of code is fairly
+small and relates to a step of the state machine diagram. Tests also accompany the
+implementation.</p>
+
+<p>I don&rsquo;t think that going in detail on the implementation will be much value, it is
+fairly self contained. However, some of the testing is actually more interesting than
+the debounce code. In particular, you&rsquo;ll notice that I decided to setup the state machine
+by calling <code>broadcast_from!</code> rather than changing the state manually. I feel that this
+gives the best &ldquo;end usage&rdquo; representation of the code, rather than an artifical test setup.
+In addition, I do lay back on reading the socket state to get the updated assignment
+values. There may be a better way to do this.</p>
+
+<hr>
+
+<p>I hope you find this technique useful if you run into a similar use case. There may
+even be opportunity to turn something like this into a library which can be used
+more general purpose.</p>
+
+<p>Thanks for reading the 12th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+am looking for new topics to write about, so please reach out if there&rsquo;s anything you
+really want to see!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
