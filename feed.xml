@@ -4,10 +4,90 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-12T23:09:00-05:00</updated>
+  <updated>2018-02-13T21:01:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 Days - Talk Recap - Elixir in Production</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/14/talk-recap-elixir-in-production.html"/>
+    <id>https://stephenbussey.com/2018/02/14/talk-recap-elixir-in-production.html</id>
+    <published>2018-02-13T21:01:00-05:00</published>
+    <updated>2018-02-13T22:26:46-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I very recently gave a talk at the Atlanta Elixir Meetup called &amp;ldquo;Elixir in Production&amp;rdquo;.
+The talk was fairly broad, but focused on what is needed to talk Elixir into production
+from both a personal and technical standpoint.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;iframe
+    width="560"
+    height="315"
+    src="https://www.youtube.com/embed/sdqct3uN6ZU"
+    frameborder="0"
+    allow="encrypted-media"
+    allowfullscreen&gt;
+  &lt;/iframe&gt;
+  &lt;div&gt;
+    &lt;small&gt;
+      &lt;i&gt;Recording of the Atlanta Meetup&lt;/i&gt;
+    &lt;/small&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;h2&gt;Human Element&lt;/h2&gt;
+
+&lt;p&gt;One of the prevailing messages that I focus on is that the decision to use a
+technology is not just about working out technical challenges and mastering
+the technology over time. Rather, I think that the &amp;ldquo;human element&amp;rdquo; needs to
+be considered early and often.&lt;/p&gt;
+
+&lt;p&gt;As an overarching theme, empathy and caring for others on the team is crucial.
+All objectives and goals should keep the engineers on the team in mind. Questions like
+&amp;ldquo;how will this affect my day to day&amp;rdquo; or &amp;ldquo;what mentorship will be available for me&amp;rdquo;
+should be considered in putting together any timelines.&lt;/p&gt;
+
+&lt;p&gt;In order to establish a healthy level of expertise and mentorship, I break down
+two distinct roles which are useful in rolling out a new language: champions and helpers.
+The champion (1-2 per team) are going to focus on overcoming any obstacles to roll out the
+new technology. Champions are people who can stand to be interrupted to help out others
+on the team. On top of champions, helpers who help out with questions and expertise
+are established as the technology is implemented.&lt;/p&gt;
+
+&lt;p&gt;As team members gain knowledge, expertise, and motivation behind the new tech, critical
+mass can be established. Use this to accelerate the objectives and bring more team members
+into the mix.&lt;/p&gt;
+
+&lt;h2&gt;Tech Element&lt;/h2&gt;
+
+&lt;p&gt;Of course, the human element isn&amp;rsquo;t everything. There is ideation, implementation, and maintenance
+to be conquered in bringing Elixir to the organization.&lt;/p&gt;
+
+&lt;p&gt;Existing technology requirements should be considered early. In established technology stacks,
+some pieces are going to be non-negotiable. There may be proprietary authentication systems,
+databases, etc which need to be integrated with from day 1. Knowing about these and planning
+for them early, rather than by surprise later, may help speed along the process.&lt;/p&gt;
+
+&lt;p&gt;I have really enjoyed two different articles by Hamidreza Soleimani:
+&lt;a href="https://hamidreza-s.github.io/erlang/scheduling/real-time/preemptive/migration/2016/02/09/erlang-scheduler-details.html" target="_blank"&gt;Erlang Scheduler Details and Why It Matters&lt;/a&gt; and
+&lt;a href="https://hamidreza-s.github.io/erlang%20garbage%20collection%20memory%20layout%20soft%20realtime/2015/08/24/erlang-garbage-collection-details-and-why-it-matters.html" target="_blank"&gt;Erlang Garbage Collection Details and Why It Matters&lt;/a&gt;. I found both of these posts to be among the best in terms of
+understanding core parts of the erlang runtime.&lt;/p&gt;
+
+&lt;p&gt;Finally, there are operational needs from deploying the app to maintaining it in production.
+These differ greatly based on an organization, but there are some clear patterns that win out
+in Elixir. Whatever you end up with, I would expect high upfront cost followed by quicker
+times in the future.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;Thanks for reading the 12th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
+really want to see!&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 Days - Debounce websocket messages</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/13/debounce-websocket-messages.html"/>
@@ -543,93 +623,6 @@ elegant solutions in mind.&lt;/p&gt;
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
 really want to see!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 Days - The Beauty of Macros</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/08/the-beauty-of-macros.html"/>
-    <id>https://stephenbussey.com/2018/02/08/the-beauty-of-macros.html</id>
-    <published>2018-02-07T22:31:00-05:00</published>
-    <updated>2018-02-07T22:48:55-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I&amp;rsquo;m aiming for a shorter post today, as I presented a 50 minute talk about &amp;ldquo;Elixir in Production&amp;rdquo;
-at the Atlanta Elixir Meetup tonight. I&amp;rsquo;m proud of how the talk turned out, but I&amp;rsquo;m
-also looking forward to hearing what content will make it better, and submitting it
-to conferences.&lt;/p&gt;
-
-&lt;p&gt;For the end of the first week (7th day) of Elixir writing, I wanted to break down a
-small chunk of code that I recently wrote that utilizes macros. In particular,
-there&amp;rsquo;s a cool property of macros that I want to explain. Let&amp;rsquo;s just go into the code:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;defmodule SalesloftApi.Phoenix.Router do
-  defmacro setup({:__aliases__, _ctx, module_path}, controller) do
-    router_module = Module.concat(module_path)
-
-    router_module.min_api_version()..router_module.current_api_version()
-    |&amp;gt; Enum.flat_map(fn api_version -&amp;gt;
-      router_module.routes()
-      |&amp;gt; Map.values()
-      |&amp;gt; Enum.map(fn route = %{http_verb: verb} -&amp;gt;
-        path = SalesloftApi.Route.path(route)
-
-        quote do
-          scope &amp;quot;/v#{unquote(api_version)}&amp;quot; do
-            unquote(verb)(unquote(path), unquote(controller), :execute, assigns: %{route: unquote(Macro.escape(route))})
-          end
-        end
-      end)
-    end)
-  end
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;For context, this code is an adapter to convert between a router module and phoenix routes.
-We are doing this in order to provide our API at a level outside of just HTTP (like websockets or
-console) and to ensure that we can control how the API is documented at a very native
-level. I previous &lt;a href="/2017/09/04/get-your-rails-out-of-my-ruby-http.html" target="_blank"&gt;wrote&lt;/a&gt; about a similar
-concept in Ruby.&lt;/p&gt;
-
-&lt;p&gt;This code is a macro which accepts a module and a controller module into it. It&amp;rsquo;s intended to be
-called from a Phoenix.Router module.&lt;/p&gt;
-
-&lt;p&gt;The code follows this simplified flow:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;Iterate over available versions of the API (2-&amp;gt;2 currently)&lt;/li&gt;
-&lt;li&gt;Iterate over the available routes&lt;/li&gt;
-&lt;li&gt;Generate some Phoenix.Router compatible code like:&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;pre&gt;&lt;code&gt;scope &amp;quot;/v2&amp;quot; do
-  get(&amp;quot;/widgets&amp;quot;, FrontController, :execute, assigns: %{route: route})
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;ul&gt;
-&lt;li&gt;Provide the generated code as the macro&amp;rsquo;s return.&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;Here is my &lt;strong&gt;favorite&lt;/strong&gt; part of this code: it doesn&amp;rsquo;t know what phoenix is. This project
-does not take phoenix in as a dependency&amp;hellip;you don&amp;rsquo;t need to use phoenix to use this module.
-What needs to happen is that there must be code that supports &lt;code&gt;scope&lt;/code&gt; and &lt;code&gt;get&lt;/code&gt;/friends in
-the module that calls this. It just happens to be phoenix.&lt;/p&gt;
-
-&lt;p&gt;This captures the flexibility of Elixir very concisely. The code that a macro generates is
-&amp;ldquo;placed into&amp;rdquo; the call site, and the original library doesn&amp;rsquo;t execute that code.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;If you do decide to learn what macros are about, I can&amp;rsquo;t recommend
-&lt;a href="https://pragprog.com/book/cmelixir/metaprogramming-elixir" target="_blank"&gt;Metaprogramming Elixir&lt;/a&gt; enough.
-I found the book to be excellent at highlighting how macros are really used in the
-Elixir code that I use daily.&lt;/p&gt;
-
-&lt;p&gt;Thanks for reading the 7th post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-am leaving for vacation tomorrow. I&amp;rsquo;m excited for the time to reflect on interesting topics and
-to have more time in the evening to write about them&amp;hellip;hopefully. Cheers!&lt;/p&gt;
 </content>
   </entry>
 </feed>

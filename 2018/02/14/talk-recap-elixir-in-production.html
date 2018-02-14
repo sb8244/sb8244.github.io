@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 Days - Talk Recap - Elixir in Production</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 Days - Talk Recap - Elixir in Production</h1>
+      <p>I very recently gave a talk at the Atlanta Elixir Meetup called &ldquo;Elixir in Production&rdquo;.
+The talk was fairly broad, but focused on what is needed to talk Elixir into production
+from both a personal and technical standpoint.</p>
+
+<div style="text-align: center">
+  <iframe
+    width="560"
+    height="315"
+    src="https://www.youtube.com/embed/sdqct3uN6ZU"
+    frameborder="0"
+    allow="encrypted-media"
+    allowfullscreen>
+  </iframe>
+  <div>
+    <small>
+      <i>Recording of the Atlanta Meetup</i>
+    </small>
+  </div>
+</div>
+
+<h2>Human Element</h2>
+
+<p>One of the prevailing messages that I focus on is that the decision to use a
+technology is not just about working out technical challenges and mastering
+the technology over time. Rather, I think that the &ldquo;human element&rdquo; needs to
+be considered early and often.</p>
+
+<p>As an overarching theme, empathy and caring for others on the team is crucial.
+All objectives and goals should keep the engineers on the team in mind. Questions like
+&ldquo;how will this affect my day to day&rdquo; or &ldquo;what mentorship will be available for me&rdquo;
+should be considered in putting together any timelines.</p>
+
+<p>In order to establish a healthy level of expertise and mentorship, I break down
+two distinct roles which are useful in rolling out a new language: champions and helpers.
+The champion (1-2 per team) are going to focus on overcoming any obstacles to roll out the
+new technology. Champions are people who can stand to be interrupted to help out others
+on the team. On top of champions, helpers who help out with questions and expertise
+are established as the technology is implemented.</p>
+
+<p>As team members gain knowledge, expertise, and motivation behind the new tech, critical
+mass can be established. Use this to accelerate the objectives and bring more team members
+into the mix.</p>
+
+<h2>Tech Element</h2>
+
+<p>Of course, the human element isn&rsquo;t everything. There is ideation, implementation, and maintenance
+to be conquered in bringing Elixir to the organization.</p>
+
+<p>Existing technology requirements should be considered early. In established technology stacks,
+some pieces are going to be non-negotiable. There may be proprietary authentication systems,
+databases, etc which need to be integrated with from day 1. Knowing about these and planning
+for them early, rather than by surprise later, may help speed along the process.</p>
+
+<p>I have really enjoyed two different articles by Hamidreza Soleimani:
+<a href="https://hamidreza-s.github.io/erlang/scheduling/real-time/preemptive/migration/2016/02/09/erlang-scheduler-details.html" target="_blank">Erlang Scheduler Details and Why It Matters</a> and
+<a href="https://hamidreza-s.github.io/erlang%20garbage%20collection%20memory%20layout%20soft%20realtime/2015/08/24/erlang-garbage-collection-details-and-why-it-matters.html" target="_blank">Erlang Garbage Collection Details and Why It Matters</a>. I found both of these posts to be among the best in terms of
+understanding core parts of the erlang runtime.</p>
+
+<p>Finally, there are operational needs from deploying the app to maintaining it in production.
+These differ greatly based on an organization, but there are some clear patterns that win out
+in Elixir. Whatever you end up with, I would expect high upfront cost followed by quicker
+times in the future.</p>
+
+<hr>
+
+<p>Thanks for reading the 12th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+am looking for new topics to write about, so please reach out if there&rsquo;s anything you
+really want to see!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
