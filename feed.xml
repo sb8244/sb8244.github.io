@@ -13,11 +13,11 @@
     <link rel="alternate" href="https://stephenbussey.com/2018/02/15/intro-to-elixir-enumerable.html"/>
     <id>https://stephenbussey.com/2018/02/15/intro-to-elixir-enumerable.html</id>
     <published>2018-02-15T01:41:00-05:00</published>
-    <updated>2018-02-15T02:26:30-05:00</updated>
+    <updated>2018-02-15T02:27:26-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
-    <content type="html">&lt;p&gt;My co-worker recently sent me a message for a blog post idea: looking at how
+    <content type="html">&lt;p&gt;My co-worker Ben recently sent me a message for a blog post idea: looking at how
 Enumerable is utilized by Elixir Enum module. Specifically, he told me that
 all of Enum behavior can be implemented just by writing a single reduce
 function. If you&amp;rsquo;re like me, you might be thinking: &amp;ldquo;what, how is this?&amp;rdquo; Let&amp;rsquo;s
