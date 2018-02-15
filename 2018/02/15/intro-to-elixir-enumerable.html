@@ -1,0 +1,160 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 Days - Intro to Elixir Enumerable</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 Days - Intro to Elixir Enumerable</h1>
+      <p>My co-worker recently sent me a message for a blog post idea: looking at how
+Enumerable is utilized by Elixir Enum module. Specifically, he told me that
+all of Enum behavior can be implemented just by writing a single reduce
+function. If you&rsquo;re like me, you might be thinking: &ldquo;what, how is this?&rdquo; Let&rsquo;s
+dive in.</p>
+
+<p>The goal of today&rsquo;s post isn&rsquo;t around how to use Enumerable to write your own, but
+rather about how Enum is implemented and how it can use such a simple Enumerable interface
+to achieve all of the Enum functionality.</p>
+
+<h2>Enumerable Protocol</h2>
+
+<p>The <a href="https://hexdocs.pm/elixir/Enumerable.html" target="_blank">Elixir Enumerable docs</a> seem like a
+good place to start this investigation. Sure enough, here we have it:</p>
+
+<blockquote>
+<p>This protocol requires four functions to be implemented, reduce/3, count/1, member?/2, and slice/1. The core of the protocol is the reduce/3 function. All other functions exist as optimizations paths for data structures that can implement certain properties in better than linear time.</p>
+</blockquote>
+
+<p>Okay, so we know that only reduce/3 is required to be implemented. However, this
+function has a very particular type signature to make this all possible. A picture is
+worth a thousand words, so <a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L3261" target="_blank">here</a>
+is the reduce implementation for List:</p>
+
+<pre><code>def reduce(_,       {:halt, acc}, _fun),   do: {:halted, acc}
+def reduce(list,    {:suspend, acc}, fun), do: {:suspended, acc, &amp;reduce(list, &amp;1, fun)}
+def reduce([],      {:cont, acc}, _fun),   do: {:done, acc}
+def reduce([h | t], {:cont, acc}, fun),    do: reduce(t, fun.(h, acc), fun)
+</code></pre>
+
+<p>The final accumulation value is returned as <code>{:done, term}</code>. Two alternate states should be
+handled: <code>halt</code> and <code>suspend</code>. <code>suspend</code> in particular is a special case which is noted as
+not being needed by most regular enumerables.</p>
+
+<h2>How is reduce/3 used?</h2>
+
+<p>It took me a second to realize how this singular <code>reduce/3</code> function signature can be
+used to implement all Enum functions. Let&rsquo;s look at a few examples:</p>
+
+<pre><code>def any?(enumerable, fun) do
+  Enumerable.reduce(enumerable, {:cont, false}, fn entry, _ -&gt;
+    if fun.(entry), do: {:halt, true}, else: {:cont, false}
+  end)
+  |&gt; elem(1)
+end
+</code></pre>
+
+<p>In the any? implementation, the reducer is used in such a way that it halts immediately
+if the function is truthy, otherwise continuing the enumeration.</p>
+
+<p>Let&rsquo;s look at a function that utilizes the optional <code>count</code> Enumerable function:</p>
+
+<pre><code>def count(enumerable) do
+  case Enumerable.count(enumerable) do
+    {:ok, value} when is_integer(value) -&gt;
+      value
+
+    {:error, module} -&gt;
+      enumerable |&gt; module.reduce({:cont, 0}, fn _, acc -&gt; {:cont, acc + 1} end) |&gt; elem(1)
+  end
+end
+</code></pre>
+
+<p>In the above Enum.count implementation, the <code>Enumerable.count/1</code> function is invoked for the
+enumerable. If it&rsquo;s available and is an integer, then it&rsquo;s returned. Otherwise, the reduce function
+is used for a linear time count implementation. It&rsquo;s possible to see how the reduce function is
+used for a count, keeping an accumulator that starts at 0 and becomes acc + 1 on each enumeration.</p>
+
+<p>Finally, certain Enum functions rely on a set of macros defined in <a href="https://github.com/elixir-lang/elixir/blob/0727eaf37dbb7f2f5b9f4e7d0ab163e655dd8a3b/lib/elixir/lib/stream/reducers.ex#L134" target="_blank"><code>Stream.Reducers</code></a>.
+These functions appear as <code>R.fn</code> in the Enum code, as the required module is aliased as such.
+The Reducers module is implemented using some interesting meta programming. If we look at the
+<a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L1302" target="_blank"><code>map/2</code> macro definition</a>,
+it utilizes a <code>next/3</code> function which isn&rsquo;t defined in this macro module. This is actually defined
+in the <a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L241" target="_blank">Enum module</a>,
+and works due to macros not evaluating code at generation time, but rather at execution time. I talked
+about this trait of macros in the <a href="/2018/02/08/the-beauty-of-macros.html" target="_blank">Beauty of Macros</a> post.</p>
+
+<h2>Writing Enumerable Implementations</h2>
+
+<p>I&rsquo;m purposely keeping this post fairly light on how to implement the Enumerable protocol
+in practice, there are several good resources on how to do that. Understanding the underlying
+implementation is more of my focus here. However, there is benefit in looking at the Enumerable
+implementation for some core types like List and Map. The Enum module
+<a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L3273" target="_blank">defines these implementations</a>
+and they can serve as a good starting point when writing your own.</p>
+
+<hr>
+
+<p>As you find yourself wondering how Elixir is internally built, keep in mind that the
+majority of Elixir is simply Elixir code. You most likely won&rsquo;t need to read erlang or
+C code like you may need to in other languages. The best answers to your questions and
+curiosities are found in the code itself.</p>
+
+<p>Thanks for reading the 14th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+am looking for new topics to write about, so please reach out if there&rsquo;s anything you
+really want to see!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>

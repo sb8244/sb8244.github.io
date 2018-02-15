@@ -4,16 +4,124 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-13T21:01:00-05:00</updated>
+  <updated>2018-02-15T01:41:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 Days - Intro to Elixir Enumerable</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/15/intro-to-elixir-enumerable.html"/>
+    <id>https://stephenbussey.com/2018/02/15/intro-to-elixir-enumerable.html</id>
+    <published>2018-02-15T01:41:00-05:00</published>
+    <updated>2018-02-15T02:26:30-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;My co-worker recently sent me a message for a blog post idea: looking at how
+Enumerable is utilized by Elixir Enum module. Specifically, he told me that
+all of Enum behavior can be implemented just by writing a single reduce
+function. If you&amp;rsquo;re like me, you might be thinking: &amp;ldquo;what, how is this?&amp;rdquo; Let&amp;rsquo;s
+dive in.&lt;/p&gt;
+
+&lt;p&gt;The goal of today&amp;rsquo;s post isn&amp;rsquo;t around how to use Enumerable to write your own, but
+rather about how Enum is implemented and how it can use such a simple Enumerable interface
+to achieve all of the Enum functionality.&lt;/p&gt;
+
+&lt;h2&gt;Enumerable Protocol&lt;/h2&gt;
+
+&lt;p&gt;The &lt;a href="https://hexdocs.pm/elixir/Enumerable.html" target="_blank"&gt;Elixir Enumerable docs&lt;/a&gt; seem like a
+good place to start this investigation. Sure enough, here we have it:&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;This protocol requires four functions to be implemented, reduce/3, count/1, member?/2, and slice/1. The core of the protocol is the reduce/3 function. All other functions exist as optimizations paths for data structures that can implement certain properties in better than linear time.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Okay, so we know that only reduce/3 is required to be implemented. However, this
+function has a very particular type signature to make this all possible. A picture is
+worth a thousand words, so &lt;a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L3261" target="_blank"&gt;here&lt;/a&gt;
+is the reduce implementation for List:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;def reduce(_,       {:halt, acc}, _fun),   do: {:halted, acc}
+def reduce(list,    {:suspend, acc}, fun), do: {:suspended, acc, &amp;amp;reduce(list, &amp;amp;1, fun)}
+def reduce([],      {:cont, acc}, _fun),   do: {:done, acc}
+def reduce([h | t], {:cont, acc}, fun),    do: reduce(t, fun.(h, acc), fun)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The final accumulation value is returned as &lt;code&gt;{:done, term}&lt;/code&gt;. Two alternate states should be
+handled: &lt;code&gt;halt&lt;/code&gt; and &lt;code&gt;suspend&lt;/code&gt;. &lt;code&gt;suspend&lt;/code&gt; in particular is a special case which is noted as
+not being needed by most regular enumerables.&lt;/p&gt;
+
+&lt;h2&gt;How is reduce/3 used?&lt;/h2&gt;
+
+&lt;p&gt;It took me a second to realize how this singular &lt;code&gt;reduce/3&lt;/code&gt; function signature can be
+used to implement all Enum functions. Let&amp;rsquo;s look at a few examples:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;def any?(enumerable, fun) do
+  Enumerable.reduce(enumerable, {:cont, false}, fn entry, _ -&amp;gt;
+    if fun.(entry), do: {:halt, true}, else: {:cont, false}
+  end)
+  |&amp;gt; elem(1)
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In the any? implementation, the reducer is used in such a way that it halts immediately
+if the function is truthy, otherwise continuing the enumeration.&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s look at a function that utilizes the optional &lt;code&gt;count&lt;/code&gt; Enumerable function:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;def count(enumerable) do
+  case Enumerable.count(enumerable) do
+    {:ok, value} when is_integer(value) -&amp;gt;
+      value
+
+    {:error, module} -&amp;gt;
+      enumerable |&amp;gt; module.reduce({:cont, 0}, fn _, acc -&amp;gt; {:cont, acc + 1} end) |&amp;gt; elem(1)
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In the above Enum.count implementation, the &lt;code&gt;Enumerable.count/1&lt;/code&gt; function is invoked for the
+enumerable. If it&amp;rsquo;s available and is an integer, then it&amp;rsquo;s returned. Otherwise, the reduce function
+is used for a linear time count implementation. It&amp;rsquo;s possible to see how the reduce function is
+used for a count, keeping an accumulator that starts at 0 and becomes acc + 1 on each enumeration.&lt;/p&gt;
+
+&lt;p&gt;Finally, certain Enum functions rely on a set of macros defined in &lt;a href="https://github.com/elixir-lang/elixir/blob/0727eaf37dbb7f2f5b9f4e7d0ab163e655dd8a3b/lib/elixir/lib/stream/reducers.ex#L134" target="_blank"&gt;&lt;code&gt;Stream.Reducers&lt;/code&gt;&lt;/a&gt;.
+These functions appear as &lt;code&gt;R.fn&lt;/code&gt; in the Enum code, as the required module is aliased as such.
+The Reducers module is implemented using some interesting meta programming. If we look at the
+&lt;a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L1302" target="_blank"&gt;&lt;code&gt;map/2&lt;/code&gt; macro definition&lt;/a&gt;,
+it utilizes a &lt;code&gt;next/3&lt;/code&gt; function which isn&amp;rsquo;t defined in this macro module. This is actually defined
+in the &lt;a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L241" target="_blank"&gt;Enum module&lt;/a&gt;,
+and works due to macros not evaluating code at generation time, but rather at execution time. I talked
+about this trait of macros in the &lt;a href="/2018/02/08/the-beauty-of-macros.html" target="_blank"&gt;Beauty of Macros&lt;/a&gt; post.&lt;/p&gt;
+
+&lt;h2&gt;Writing Enumerable Implementations&lt;/h2&gt;
+
+&lt;p&gt;I&amp;rsquo;m purposely keeping this post fairly light on how to implement the Enumerable protocol
+in practice, there are several good resources on how to do that. Understanding the underlying
+implementation is more of my focus here. However, there is benefit in looking at the Enumerable
+implementation for some core types like List and Map. The Enum module
+&lt;a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L3273" target="_blank"&gt;defines these implementations&lt;/a&gt;
+and they can serve as a good starting point when writing your own.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;As you find yourself wondering how Elixir is internally built, keep in mind that the
+majority of Elixir is simply Elixir code. You most likely won&amp;rsquo;t need to read erlang or
+C code like you may need to in other languages. The best answers to your questions and
+curiosities are found in the code itself.&lt;/p&gt;
+
+&lt;p&gt;Thanks for reading the 14th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
+really want to see!&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 Days - Talk Recap - Elixir in Production</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/14/talk-recap-elixir-in-production.html"/>
     <id>https://stephenbussey.com/2018/02/14/talk-recap-elixir-in-production.html</id>
     <published>2018-02-13T21:01:00-05:00</published>
-    <updated>2018-02-13T22:26:46-05:00</updated>
+    <updated>2018-02-15T02:24:10-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -82,7 +190,7 @@ times in the future.&lt;/p&gt;
 
 &lt;hr&gt;
 
-&lt;p&gt;Thanks for reading the 12th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+&lt;p&gt;Thanks for reading the 13th post in my 28 days of Elixir. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
 really want to see!&lt;/p&gt;
@@ -510,116 +618,6 @@ of advice for someone going down a similar path: &amp;ldquo;just start&amp;rdquo
 and figure out a way to make progress, overcoming challenges that inevitably rise.&lt;/p&gt;
 
 &lt;p&gt;Thanks for reading the 9th post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
-really want to see!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 Days - Demo - Single process in a distributed system</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/09/demo-explanation-single-process-in-a-distributed-system.html"/>
-    <id>https://stephenbussey.com/2018/02/09/demo-explanation-single-process-in-a-distributed-system.html</id>
-    <published>2018-02-08T22:20:00-05:00</published>
-    <updated>2018-02-08T23:37:33-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I&amp;rsquo;m really excited about this post, I&amp;rsquo;ve been thinking about what the demo will
-look like for several days, but it turned out differently than I had in my head.
-I&amp;rsquo;m writing this from 35k feet on my way to vacation; there&amp;rsquo;s nothing better than
-being on a plane to hash out technical problems that have been put off. It would
-be great if the wifi worked though&amp;hellip;&lt;/p&gt;
-
-&lt;p&gt;Today&amp;rsquo;s post is going to be a demo + walkthrough of creating a singular process
-chokepoint in a distributed system. That might not be the best way to explain it, but
-I&amp;rsquo;m also struggling to find a better explanation. The end goal is that in a cluster
-of 3 nodes, I can say &amp;ldquo;request id 1&amp;rdquo; and have that go to node 1 every time. I can say
-&amp;ldquo;request id 3&amp;rdquo; and have that go to node 3.&lt;/p&gt;
-
-&lt;h2&gt;Code / Demo&lt;/h2&gt;
-
-&lt;p&gt;The code is found at &lt;a href="https://www.github.com/sb8244/distributed_process_demo" target="_blank"&gt;https://www.github.com/sb8244/distributed_process_demo&lt;/a&gt;.
-The repo has instructions for the actual demo and how it should be run.&lt;/p&gt;
-
-&lt;p&gt;This code is in the intermediate category, probably. However, it&amp;rsquo;s short and the
-tools used are core for building Elixir apps. Don&amp;rsquo;t be shy to dig in and break it
-locally to really learn what&amp;rsquo;s going on!&lt;/p&gt;
-
-&lt;h2&gt;How it works&lt;/h2&gt;
-
-&lt;p&gt;Elixir has the ability to connect to other nodes that are accessible on the network. We
-can use this to spawn several local nodes that simulate a networked environment. The
-&lt;a href="https://github.com/sb8244/distributed_process_demo/blob/master/lib/distributed_process.ex#L4" target="_blank"&gt;&lt;code&gt;DistributedProcess.connect()&lt;/code&gt;&lt;/a&gt;
-function iterates on up to 5 known node names and connects to them. This is a quick hack to get them connected.&lt;/p&gt;
-
-&lt;p&gt;The application creates two different top level supervisors, a &lt;code&gt;Registry&lt;/code&gt; which allows
-unique storage of processes (unique by ID here) and a &lt;code&gt;DistributedProcess.Supervisor&lt;/code&gt;.&lt;/p&gt;
-
-&lt;p&gt;The &lt;a href="https://github.com/sb8244/distributed_process_demo/blob/master/lib/distributed_process/supervisor.ex" target="_blank"&gt;&lt;code&gt;DistributedProcess.Supervisor&lt;/code&gt;&lt;/a&gt;
-does the majority of the work for distributing our
-process across the cluster. It accepts an &lt;code&gt;id&lt;/code&gt; into the &lt;code&gt;get_worker/1&lt;/code&gt; function, and
-uses a modulo operator on the number of nodes to determine which node will be the lucky
-receiver of this request. The size of a node is fairly consistent in practice, so this
-seems acceptable for starters.&lt;/p&gt;
-
-&lt;p&gt;When the right node is chosen, the &lt;code&gt;DynamicSupervisor.start_child&lt;/code&gt; call creates an instance
-of a &lt;code&gt;DistributedProcess.Worker&lt;/code&gt; on the local or remote chosen node. This Worker is setup to
-be unique based on the ID. This is really helpful as it allows future calls to the same ID
-to return the same process.&lt;/p&gt;
-
-&lt;p&gt;Once a local or remote pid is returned from the DynamicSupervisor, that pid has a &lt;code&gt;call&lt;/code&gt; request
-execute against it. &lt;code&gt;call&lt;/code&gt; will return an answer synchronously, which is great for the purposes
-of this demo.&lt;/p&gt;
-
-&lt;p&gt;In the &lt;a href="https://github.com/sb8244/distributed_process_demo/blob/master/lib/distributed_process/worker.ex" target="_blank"&gt;&lt;code&gt;DistributedProcess.Worker&lt;/code&gt;&lt;/a&gt;,
-the first thing is does is actually tell itself to be destroyed
-in 5 seconds. This is to make the demo interesting, but also simulates the use case of a short
-lived cache.&lt;/p&gt;
-
-&lt;p&gt;The &lt;code&gt;handle_call(:request)&lt;/code&gt; function in the worker does 2 different things, for 2 different
-function heads. The first is if there is a value in the local state. Then it is simply
-returned as is. The second is if there is no value in the local state. A random 1-1000
-integer is selected and placed in the state, along with the node name. This allows us to see
-that the data is in fact changing every 5 seconds, and where it came from.&lt;/p&gt;
-
-&lt;p&gt;All of this is packaged up into 2 top level functions that are called: &lt;code&gt;DistributedProcess.connect()&lt;/code&gt;
-and &lt;code&gt;DistributedProcess.request(id)&lt;/code&gt;.&lt;/p&gt;
-
-&lt;h2&gt;Use Case&lt;/h2&gt;
-
-&lt;p&gt;It may be desirable to have a single choke point across a cluster to handle a single
-type of request. For instance, maybe a certain tenant should only execute on a single
-server. This ensures that the requests for that tenant are serial (non-parallel).&lt;/p&gt;
-
-&lt;p&gt;My use case is to cache requests to a certain resource/id pair for 30-60 seconds. I want
-to make a single request, then return that value for the lifetime of it. I do not
-want to introduce a DB layer just for this caching, as maintaining that is prone to
-easier logic errors around cache expiration and checking.&lt;/p&gt;
-
-&lt;h2&gt;Final Thoughts&lt;/h2&gt;
-
-&lt;p&gt;I&amp;rsquo;m most excited about how this code doesn&amp;rsquo;t really feel remote. It can run on a
-local system just as well as in a clustered system, and it scales with cluster size
-with no additional work. That is pretty fun!&lt;/p&gt;
-
-&lt;p&gt;I don&amp;rsquo;t know how I would easily test this code. Not having internet led me to not
-test this code today. However, I will probably look into how I can test it and write
-about that in the future. I have had several requests for testing posts, especially
-if they involve complex setups.&lt;/p&gt;
-
-&lt;p&gt;I do not know, yet, how I would handle a situation of fetching an array of ids. I would
-want the cache to be distributed, but there is a challenge in not having the same id
-set each time. This sort of breaks the technique, but it doesn&amp;rsquo;t mean it&amp;rsquo;s not valuable
-for single / deterministic ids.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;Thanks to my co-worker Ben for bouncing this idea around at SalesLoft. We haven&amp;rsquo;t placed
-the technique in production yet, but him and I were both really excited to talk about it.
-I&amp;rsquo;m curious to see how he would approach this type of problem, as I know he had more
-elegant solutions in mind.&lt;/p&gt;
-
-&lt;p&gt;Thanks for reading the 8th post in my 28 days of Elixir. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
 really want to see!&lt;/p&gt;
