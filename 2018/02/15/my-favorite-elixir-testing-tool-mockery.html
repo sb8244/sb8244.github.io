@@ -1,0 +1,186 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 Days - My favorite Elixir testing tool - Mockery</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 Days - My favorite Elixir testing tool - Mockery</h1>
+      <p>I hate to admit it, but I&rsquo;ve finally started truly unit testing with Elixir. I come
+from the Ruby world where our large test suite often runs slowly due to things like
+data insertion / access in the tests, large object graphs, etc. It&rsquo;s easy to criticize
+situations like this after the fact, but I find the reasons along the way were paved
+with the best intentions. As I learn and adopt Elixir at SalesLoft, I&rsquo;ve been extra
+careful to avoid these situations from playing out again.</p>
+
+<p>The biggest tool in my arsenal so far has been <a href="https://github.com/appunite/mockery" target="_blank">Mockery</a>, a mocking tool that
+allows the test suite to be run in parallel. This seems like a natural thing to expect
+from a mocking tool, but some others that I used do not have this property. I think
+that the design of Mockery also leads to cleaner code, so I&rsquo;ve adopted it.</p>
+
+<h2>Mockery Usage</h2>
+
+<p>The Github for Mockery lays out all different usage possibilities for it, I&rsquo;ll just
+cover the one or two that I use most often.</p>
+
+<p>The first, and most common case, is mocking out expensive operations. An example of this is network requests;
+I&rsquo;m able to use tools to test these requests (topic for another post?), in their specific modules,
+but then keep these requests out of other places. Another example is for database access. I
+can write query objects or repositories to handle the fetching / insertion of data, but
+then mock out these modules in their usage throughout a system. Here&rsquo;s an example usage:</p>
+
+<pre><code>defmodule MyRequest do
+  @widgets_query Mockery.of(&quot;WidgetsQuery&quot;)
+
+  def call(authentication_context) do
+    @widgets_query.call(authentication_context)
+  end
+end
+
+defmodule MyRequestTest do
+  use ExUnit.Case, async: true
+  use Mockery
+
+  test &quot;call returns the widgets query&quot; do
+    auth = %{}
+    mock WidgetsQuery, :call, [%Widget{id: 1}, %Widget{id: 2}]
+    assert MyRequest.call(auth) == [%Widget{id: 1}, %Widget{id: 2}]
+    assert_called WidgetsQuery, :call, [^auth]
+  end
+end
+</code></pre>
+
+<p>This is about the most basic usage to Mockery possible. The module is mocked
+for this process only, then used by the request. After the call, we can check that
+it was called properly. This allows the important parts of a mock to be fully covered
+in our test suite: params and results.</p>
+
+<p>There is another usage of Mockery that I&rsquo;ve found useful, it&rsquo;s to implement a mock that
+always exists unless specified by a test. In the above mock example, if we wrote another
+test, that module would not be mocked anymore, leading to a real database call. This
+may not be desired if we end up mocking a module in a lot of places. Enter <code>by:</code> keyword:</p>
+
+<pre><code>@widgets_query Mockery.of(&quot;WidgetsQuery&quot;, by: &quot;WidgetsQuery.Mock&quot;)
+
+defmodule WidgetsQuery do
+  defmodule Mock do
+    def call(_auth), do: []
+  end
+end
+</code></pre>
+
+<p>In the above usage of Mockery, any call in a normal test will return an empty list.
+This may not be desirable for certain cases, so your mileage will vary with such a
+technique.</p>
+
+<h2>Mockery for Processes</h2>
+
+<p>Another really powerful use case of mocking, that I&rsquo;ve found and think warrants a
+separate mention, is for process based communication. In practice, testing processes
+can get a bit hairy. Timing, process ownership, race conditions are all easily possible
+in tests due to tests running in a process and our code being able to run in processes.
+Mockery can help out here by mocking out the explicit boundaries between processes.</p>
+
+<p>While I find a ton of power in Mockery for this use case, I urge even more caution than
+others. It would be possible to devise an incorrect process tree that works in tests
+solely because of mocking. Don&rsquo;t shy away from mocking, but don&rsquo;t take to it immediately
+either.</p>
+
+<h2>Dangers of mocking</h2>
+
+<p>Mocking is not a silver bullet for tests. It can certainly help greatly with common
+expensive operations and allows for testing of boundaries rather than going past
+the boundaries in each test. However, what if our boundaries are not correct?</p>
+
+<p>A few common issues arise with mocking. It is possible to setup a mock on a function
+that doesn&rsquo;t exist, on params that are not reflective of reality, and on results that
+are not part of the type signature of the function. Each of these scenarios has the
+potential for a worst case testing scenario: code that passes locally but fails in
+QA or production testing.</p>
+
+<p>Mockery does help with the function not existing, as it requires mocking out functions
+that do exist in the target module. This can even work on arity (ensure that the right
+arity is mocked out). It cannot, unfortunately, help with the input or output not being
+real. Engineers must be on the lookout for these issues and <em>diligently</em> use mocking,
+ensuring that the usage is correct at write-time and also after any refactors.</p>
+
+<p>I haven&rsquo;t done so, but my guess is that typespecs might be able to help out here. I don&rsquo;t
+see any obvious integrations with Mockery, but anything is possible and could be implemented
+custom based on the typespec metadata.</p>
+
+<h2>Why Mockery over others?</h2>
+
+<p>I had some problems with other mocking tools that dynamically switch out modules
+globally. These types of tools require that test processes run synchronously rather
+than asynchronously. This is not a big deal for small test suites, but could be a huge
+limiter for a large test suite. At the scale of our product, I have to assume that a
+service could become large over time, and so I&rsquo;m very careful about test speed.</p>
+
+<p>I also find that defining what is mockable in the module (rather than anything being
+mockable via the test suite) allows my code to be more readable and explicit. All of
+a sudden, I can tell exactly what is mockable rather than assuming that anything is
+mockable. If I saw someone mocking an <code>Enum</code> function, for example, I would have
+an immediate red flag raised. Seeing this play out in the module rather than the
+test really does help.</p>
+
+<hr>
+
+<p>Thanks for reading the 15th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+am looking for new topics to write about, so please reach out if there&rsquo;s anything you
+really want to see!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>

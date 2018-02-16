@@ -4,10 +4,144 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-15T01:41:00-05:00</updated>
+  <updated>2018-02-15T18:23:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 Days - My favorite Elixir testing tool - Mockery</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/15/my-favorite-elixir-testing-tool-mockery.html"/>
+    <id>https://stephenbussey.com/2018/02/15/my-favorite-elixir-testing-tool-mockery.html</id>
+    <published>2018-02-15T18:23:00-05:00</published>
+    <updated>2018-02-15T20:32:37-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I hate to admit it, but I&amp;rsquo;ve finally started truly unit testing with Elixir. I come
+from the Ruby world where our large test suite often runs slowly due to things like
+data insertion / access in the tests, large object graphs, etc. It&amp;rsquo;s easy to criticize
+situations like this after the fact, but I find the reasons along the way were paved
+with the best intentions. As I learn and adopt Elixir at SalesLoft, I&amp;rsquo;ve been extra
+careful to avoid these situations from playing out again.&lt;/p&gt;
+
+&lt;p&gt;The biggest tool in my arsenal so far has been &lt;a href="https://github.com/appunite/mockery" target="_blank"&gt;Mockery&lt;/a&gt;, a mocking tool that
+allows the test suite to be run in parallel. This seems like a natural thing to expect
+from a mocking tool, but some others that I used do not have this property. I think
+that the design of Mockery also leads to cleaner code, so I&amp;rsquo;ve adopted it.&lt;/p&gt;
+
+&lt;h2&gt;Mockery Usage&lt;/h2&gt;
+
+&lt;p&gt;The Github for Mockery lays out all different usage possibilities for it, I&amp;rsquo;ll just
+cover the one or two that I use most often.&lt;/p&gt;
+
+&lt;p&gt;The first, and most common case, is mocking out expensive operations. An example of this is network requests;
+I&amp;rsquo;m able to use tools to test these requests (topic for another post?), in their specific modules,
+but then keep these requests out of other places. Another example is for database access. I
+can write query objects or repositories to handle the fetching / insertion of data, but
+then mock out these modules in their usage throughout a system. Here&amp;rsquo;s an example usage:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;defmodule MyRequest do
+  @widgets_query Mockery.of(&amp;quot;WidgetsQuery&amp;quot;)
+
+  def call(authentication_context) do
+    @widgets_query.call(authentication_context)
+  end
+end
+
+defmodule MyRequestTest do
+  use ExUnit.Case, async: true
+  use Mockery
+
+  test &amp;quot;call returns the widgets query&amp;quot; do
+    auth = %{}
+    mock WidgetsQuery, :call, [%Widget{id: 1}, %Widget{id: 2}]
+    assert MyRequest.call(auth) == [%Widget{id: 1}, %Widget{id: 2}]
+    assert_called WidgetsQuery, :call, [^auth]
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This is about the most basic usage to Mockery possible. The module is mocked
+for this process only, then used by the request. After the call, we can check that
+it was called properly. This allows the important parts of a mock to be fully covered
+in our test suite: params and results.&lt;/p&gt;
+
+&lt;p&gt;There is another usage of Mockery that I&amp;rsquo;ve found useful, it&amp;rsquo;s to implement a mock that
+always exists unless specified by a test. In the above mock example, if we wrote another
+test, that module would not be mocked anymore, leading to a real database call. This
+may not be desired if we end up mocking a module in a lot of places. Enter &lt;code&gt;by:&lt;/code&gt; keyword:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;@widgets_query Mockery.of(&amp;quot;WidgetsQuery&amp;quot;, by: &amp;quot;WidgetsQuery.Mock&amp;quot;)
+
+defmodule WidgetsQuery do
+  defmodule Mock do
+    def call(_auth), do: []
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In the above usage of Mockery, any call in a normal test will return an empty list.
+This may not be desirable for certain cases, so your mileage will vary with such a
+technique.&lt;/p&gt;
+
+&lt;h2&gt;Mockery for Processes&lt;/h2&gt;
+
+&lt;p&gt;Another really powerful use case of mocking, that I&amp;rsquo;ve found and think warrants a
+separate mention, is for process based communication. In practice, testing processes
+can get a bit hairy. Timing, process ownership, race conditions are all easily possible
+in tests due to tests running in a process and our code being able to run in processes.
+Mockery can help out here by mocking out the explicit boundaries between processes.&lt;/p&gt;
+
+&lt;p&gt;While I find a ton of power in Mockery for this use case, I urge even more caution than
+others. It would be possible to devise an incorrect process tree that works in tests
+solely because of mocking. Don&amp;rsquo;t shy away from mocking, but don&amp;rsquo;t take to it immediately
+either.&lt;/p&gt;
+
+&lt;h2&gt;Dangers of mocking&lt;/h2&gt;
+
+&lt;p&gt;Mocking is not a silver bullet for tests. It can certainly help greatly with common
+expensive operations and allows for testing of boundaries rather than going past
+the boundaries in each test. However, what if our boundaries are not correct?&lt;/p&gt;
+
+&lt;p&gt;A few common issues arise with mocking. It is possible to setup a mock on a function
+that doesn&amp;rsquo;t exist, on params that are not reflective of reality, and on results that
+are not part of the type signature of the function. Each of these scenarios has the
+potential for a worst case testing scenario: code that passes locally but fails in
+QA or production testing.&lt;/p&gt;
+
+&lt;p&gt;Mockery does help with the function not existing, as it requires mocking out functions
+that do exist in the target module. This can even work on arity (ensure that the right
+arity is mocked out). It cannot, unfortunately, help with the input or output not being
+real. Engineers must be on the lookout for these issues and &lt;em&gt;diligently&lt;/em&gt; use mocking,
+ensuring that the usage is correct at write-time and also after any refactors.&lt;/p&gt;
+
+&lt;p&gt;I haven&amp;rsquo;t done so, but my guess is that typespecs might be able to help out here. I don&amp;rsquo;t
+see any obvious integrations with Mockery, but anything is possible and could be implemented
+custom based on the typespec metadata.&lt;/p&gt;
+
+&lt;h2&gt;Why Mockery over others?&lt;/h2&gt;
+
+&lt;p&gt;I had some problems with other mocking tools that dynamically switch out modules
+globally. These types of tools require that test processes run synchronously rather
+than asynchronously. This is not a big deal for small test suites, but could be a huge
+limiter for a large test suite. At the scale of our product, I have to assume that a
+service could become large over time, and so I&amp;rsquo;m very careful about test speed.&lt;/p&gt;
+
+&lt;p&gt;I also find that defining what is mockable in the module (rather than anything being
+mockable via the test suite) allows my code to be more readable and explicit. All of
+a sudden, I can tell exactly what is mockable rather than assuming that anything is
+mockable. If I saw someone mocking an &lt;code&gt;Enum&lt;/code&gt; function, for example, I would have
+an immediate red flag raised. Seeing this play out in the module rather than the
+test really does help.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;Thanks for reading the 15th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
+really want to see!&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 Days - Intro to Elixir Enumerable</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/15/intro-to-elixir-enumerable.html"/>
@@ -512,112 +646,6 @@ current ideas are how to debounce a websocket push (push once every X seconds) a
 what happens to setup the websocket requests.&lt;/p&gt;
 
 &lt;p&gt;Thanks for reading the 10th post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
-really want to see!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 days - How I learned Elixir</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/10/how-i-learned-elixir.html"/>
-    <id>https://stephenbussey.com/2018/02/10/how-i-learned-elixir.html</id>
-    <published>2018-02-10T00:15:00-05:00</published>
-    <updated>2018-02-10T00:43:16-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I recently had a request to consider more beginner focused content in this 28 days
-series. This goes really well with one of my goals, which is to get more people
-excited about Elixir and wanting to try it out. Helping out beginners to the
-language is a great way to achieve this goal. I have been reflecting on my
-learning process and considering what worked well and didn&amp;rsquo;t work so well. I do
-recognize that everyone learns differently and values different goals. This is my perspective,
-but another person&amp;rsquo;s might be very different.&lt;/p&gt;
-
-&lt;p&gt;When I first started Elixir, I had extensive programming experience, but no real
-experiences with functional programming, nor any BEAM languages. Thus, my first goal
-became just to understand the syntax of the language and learn how the basic constructs
-of the language work (think variables, function definition / usage, etc.) I found that
-the best place for this is in the Elixir documentation itself, namely the
-&lt;a href="https://elixir-lang.org/getting-started/introduction.html" target="_blank"&gt;getting started&lt;/a&gt; guide.&lt;/p&gt;
-
-&lt;h2&gt;Getting Started Guide&lt;/h2&gt;
-
-&lt;p&gt;This guide is extensive, which is great for working out most of the finer details of
-the language itself. It breaks down into functional language tutorials, followed by
-tutorials of mix/OTP.&lt;/p&gt;
-
-&lt;p&gt;I found the initial exploration of these guides fairly straightforward. Everything would click
-well for me, and examples / changes to them work as expected. This was all great and
-felt like an achievement. However, I wasn&amp;rsquo;t really understanding the content. It took me
-about 4 times through the series before I could actually write any of it from memory. In
-particular, the OTP concepts were much more difficult to understand than I would like
-to admit. I had significant trouble in that area.&lt;/p&gt;
-
-&lt;p&gt;Transitioning out of that, I went directly into some real example projects.&lt;/p&gt;
-
-&lt;h2&gt;Finding a project&lt;/h2&gt;
-
-&lt;p&gt;I knew that the tutorial wasn&amp;rsquo;t fully cutting it for me. I ended up deciding to try to
-write a project that I knew was over my head. I ended up deciding to make a local SMTP trap.
-It would need to listen on a port and then communicate over a very basic SMTP protocol.
-This project was great for me for 2 reasons:&lt;/p&gt;
-
-&lt;ol&gt;
-&lt;li&gt;The end goal was significantly over my head from when I started&lt;/li&gt;
-&lt;li&gt;The content was beyond &amp;ldquo;normal&amp;rdquo; applications that I write, this made it interesting&lt;/li&gt;
-&lt;/ol&gt;
-
-&lt;p&gt;Even though I haven&amp;rsquo;t touched the project in a while, I do still keep it on
-&lt;a href="https://github.com/sb8244/elixir-smtp" target="_blank"&gt;github&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;Throughout this time, I had found people to bounce problems / ideas off of for how I
-would implement things. I believe that finding some support network is crucial for
-seeing these complex problems through.&lt;/p&gt;
-
-&lt;h2&gt;Educating at work&lt;/h2&gt;
-
-&lt;p&gt;The piece that has had a recent big impact on me and allowed me to solidify my learnings
-even further is switching to the perspective of teacher. At work, people have been
-adopting Elixir and gaining interest. As new people learn the language, they will
-inevitably need help with it. I find that teaching others is usually the most important
-thing for me. This is one where what you put in dictates what you get out.&lt;/p&gt;
-
-&lt;h2&gt;Things I would not do differently&lt;/h2&gt;
-
-&lt;p&gt;I don&amp;rsquo;t think that I would have looked at paid content to learn the langauge. The tutorials
-are so extensive and written by the same people that made the language that it just seems
-like the right choice to use those tutorials.&lt;/p&gt;
-
-&lt;p&gt;In addition, I would not hide any early work from the public or my peers. It
-would be okay for others to know what I was working on it even if it wasn&amp;rsquo;t ready yet, as
-it might encourage them to start up as well.&lt;/p&gt;
-
-&lt;h2&gt;Things I would do differently&lt;/h2&gt;
-
-&lt;p&gt;On the idea of educating others and doing self-learning through the Elixir tutorial,
-I will say that working through the tutorials with another person would have been a
-huge benefit. That learning/education cycle would have been established much earlier and
-allowed for the faster growth. This is obviously dependent on finding someone who is
-interested in learning Elixir.&lt;/p&gt;
-
-&lt;p&gt;I would have jumped into projects at work a bit sooner to understand even more. This
-includes both writing Elixir code myself and reading other code that other&amp;rsquo;s produced
-with significant attention.&lt;/p&gt;
-
-&lt;p&gt;I would pick a small codebase from a language that I know well (Ruby) and convert it
-into Elixir. I ended up doing this for a work library recently, and that learning was
-immense. Being a subject matter expert in a certain area means that the act of applying
-that knowledge into another language doesn&amp;rsquo;t involve getting lucky with the project
-selection.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;No matter who the person is or what their goals are, I would always have one piece
-of advice for someone going down a similar path: &amp;ldquo;just start&amp;rdquo;. Start the process
-and figure out a way to make progress, overcoming challenges that inevitably rise.&lt;/p&gt;
-
-&lt;p&gt;Thanks for reading the 9th post in my 28 days of Elixir. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
 really want to see!&lt;/p&gt;
