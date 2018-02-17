@@ -4,16 +4,137 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-15T18:23:00-05:00</updated>
+  <updated>2018-02-17T02:07:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>28 Days - pg2 basics - Use process groups for orchestration across a cluster</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/17/pg2-basics-use-process-groups-for-orchestration-across-a-cluster.html"/>
+    <id>https://stephenbussey.com/2018/02/17/pg2-basics-use-process-groups-for-orchestration-across-a-cluster.html</id>
+    <published>2018-02-17T02:07:00-05:00</published>
+    <updated>2018-02-17T03:13:06-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;One of my first major Elixir projects really cared about optimization up-front,
+due to high throughput. This led to my mentality of &amp;ldquo;no database&amp;rdquo;; I would try
+to always keep data in local heap rather than going to a database. I quickly
+encountered the biggest challenge with this: how to keep the processes that
+hold data in sync with each other. I looked at using &lt;a href="http://erlang.org/doc/man/pg2.html" target="_blank"&gt;pg2&lt;/a&gt;
+for this task, and have been very happy with the outcome.&lt;/p&gt;
+
+&lt;p&gt;An example repo is up at &lt;a href="https://github.com/sb8244/pg2_demo" target="_blank"&gt;https://github.com/sb8244/pg2_demo&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2&gt;pg2&lt;/h2&gt;
+
+&lt;p&gt;&lt;a href="http://erlang.org/doc/man/pg2.html" target="_blank"&gt;pg2&lt;/a&gt; has nothing to do with postgres,
+which is one of the most common thoughts when people see the module name.
+It creates process groups, so that is where the name comes from.&lt;/p&gt;
+
+&lt;p&gt;At the most basic explanation, pg2 allows for a group to be created and then
+for processes to connect to the group. This leads to a mapping of name -&amp;gt; pid list.
+The pid list consists of all known processes, whether they be local or remote.
+When a pg2 group is created, that group becomes visible to all connected nodes
+in the system. A pg2 group can be created multiple times without error, which
+means that each node can call &lt;code&gt;create&lt;/code&gt; without error.&lt;/p&gt;
+
+&lt;h2&gt;In practice&lt;/h2&gt;
+
+&lt;p&gt;I&amp;rsquo;ll preface this by saying that my particular problem could be solved a number of
+ways, this is just the way I approached it. Also, pg2 can be used many different ways.
+If you see any better approach for either the problem or solution, please let me know!&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s walk through each section of a module found in the &lt;a href="https://github.com/sb8244/pg2_demo" target="_blank"&gt;demonstration repo&lt;/a&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;defmodule MyWorker.Synchronization do
+  use GenServer
+
+  # The topic could simply be __MODULE__, but I like having the human name in it as well
+  @topic {:human_name, __MODULE__}
+
+  def start_link do
+    GenServer.start_link(__MODULE__, [])
+  end
+
+  def topic, do: @topic
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;pg2 works by grouping processes, so we need a process to group. I satisfy this by
+creating a process specifically for synchronization purposes. It would be possible
+to link this to the main process (MyWorker above), but there would be less performance
+with the serial nature of a process.&lt;/p&gt;
+
+&lt;p&gt;The topic is just a tuple or atom, (erlang typespec is &amp;ldquo;any&amp;rdquo;), and I generally like to
+have some human readability in the topic.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;  def init([]) do
+    :ok = :pg2.create(@topic)
+    :ok = :pg2.join(@topic, self())
+    {:ok, []}
+  end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;When the Synchronization GenServer starts, it is going to create the pg2 topic and
+then join the topic itself. This is possible due to the property pointed out earlier
+that &lt;code&gt;:pg2.create&lt;/code&gt; can be called multiple times successfully.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;  def update(some_param) do
+    :pg2.get_members(@topic)
+    |&amp;gt; Kernel.--(:pg2.get_local_members(@topic))
+    |&amp;gt; Enum.each(fn(pid) -&amp;gt;
+      send pid, {:broadcast, @topic, {:update_from_db, some_param}}
+    end)
+  end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This is the public API of the Synchronization module. The process group&amp;rsquo;s members
+are retrieved, which is every pid (local and remote) added to the group. In our case,
+it is only Synchronization module pids. Local processes are removed from this list for
+performance reasons. In my use case, the data on the local node is already correct;
+the local node does not need updated.&lt;/p&gt;
+
+&lt;p&gt;Each pid is then enumerated and is sent a broadcast message which can actually be
+any atom or tuple that we like. This can be useful for passing around parameters
+such as the changed data or tenant information.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;  def handle_info({:broadcast, @topic, {:update_from_db, some_param}}, state) do
+    MySupervisor.for_param(some_param)
+      |&amp;gt; MyWorker.load_from_db()
+    {:noreply, state}
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Finally, the message we passed around is handled. In this short demo, I&amp;rsquo;m not worrying
+about sending the changed messages over the wire, instead I am just loading it from the database.
+This can be desirable for simplicity&amp;rsquo;s sake if the data isn&amp;rsquo;t changing often.&lt;/p&gt;
+
+&lt;h2&gt;A note on distributing data&lt;/h2&gt;
+
+&lt;p&gt;Keeping multiple copies of the same data in memory, and up to date, across an entire
+cluster is a pretty hard problem, without going into details of &lt;a href="https://en.wikipedia.org/wiki/CAP_theorem" target="_blank"&gt;CAP theorem&lt;/a&gt;.
+In this pg2 solution, the data is eventually consistent. This means that some servers
+may give an incorrect answer over no answer, because they don&amp;rsquo;t have the most recent
+data yet.&lt;/p&gt;
+
+&lt;p&gt;More stringent handling of the &lt;code&gt;send&lt;/code&gt; could be coded if needed, although considering
+distributed data from the beginning is worth it.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;Thanks for reading the 16th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
+really want to see!&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>28 Days - My favorite Elixir testing tool - Mockery</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/15/my-favorite-elixir-testing-tool-mockery.html"/>
     <id>https://stephenbussey.com/2018/02/15/my-favorite-elixir-testing-tool-mockery.html</id>
     <published>2018-02-15T18:23:00-05:00</published>
-    <updated>2018-02-15T20:32:37-05:00</updated>
+    <updated>2018-02-15T20:33:13-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -483,169 +604,6 @@ at least there was good learning.&lt;/p&gt;
 &lt;hr&gt;
 
 &lt;p&gt;Thanks for reading the 11th post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
-really want to see!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 days - Phoenix websocket dive</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/10/phoenix-websocket-dive.html"/>
-    <id>https://stephenbussey.com/2018/02/10/phoenix-websocket-dive.html</id>
-    <published>2018-02-10T12:20:00-05:00</published>
-    <updated>2018-02-11T00:00:05-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I, and seemingly most people that use them, have a positive view towards Phoenix
-websockets. They are simple to use, scalable, and are stable in production. I have
-some neat content that I want to go over with websockets, but it will be better
-to do a deep dive into how they work first. In particular, the process structure
-and how they scale.&lt;/p&gt;
-
-&lt;p&gt;I have prepared a demo repository that implements a few different websocket concepts.
-The goal of this demo is to reinforce / provide material for this post. You can
-find the repo on &lt;a href="https://github.com/sb8244/websocket-demo/tree/66b7933157be16b4e6d03ab08e21fc9b9841882d" target="_blank"&gt;github&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;The beginning section will start with basics of the websocket, leading into
-how the websocket internals work.&lt;/p&gt;
-
-&lt;h2&gt;Websocket Tests&lt;/h2&gt;
-
-&lt;p&gt;Before going into the code that powers the websocket, let&amp;rsquo;s dive into the code that &lt;em&gt;tests&lt;/em&gt;
-the websocket. &lt;a href="https://hexdocs.pm/phoenix/Phoenix.ChannelTest.html" target="_blank"&gt;Phoenix.ChannelTest&lt;/a&gt; provides
-some helpers that make testing the socket simple. There is some complex setup that goes into the socket,
-but these helpers reduce the complexity.&lt;/p&gt;
-
-&lt;p&gt;The first test that I like to start with is a test for &lt;a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/test/websocket_demo_web/channels/demo_channel_test.exs#L10" target="_blank"&gt;joining a channel&lt;/a&gt;.
-A channel is an abstraction over the websocket to allow for the actual bi-directional communication. When
-we &amp;ldquo;communicate&amp;rdquo; to a socket, we&amp;rsquo;re actually communicating to the channel. It is good practice
-to test that the socket is authenticated to join a particular channel, but this demo does not
-use any authorization.&lt;/p&gt;
-
-&lt;p&gt;One of the very core behaviors of a websocket is responding to a request from the client.
-This is &lt;a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/test/websocket_demo_web/channels/demo_channel_test.exs#L45" target="_blank"&gt;tested&lt;/a&gt;
-using &lt;code&gt;assert_reply&lt;/code&gt;, which ensures that the particular push to the websocket is responded to.
-We will dig into what &amp;ldquo;responding to a push&amp;rdquo; means, below.&lt;/p&gt;
-
-&lt;p&gt;One test that I struggled a bit with was &lt;a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/test/websocket_demo_web/channels/demo_channel_test.exs#L26" target="_blank"&gt;testing that the async timer was enqueued for 5 seconds&lt;/a&gt;.
-I started this test by making the test wait for 5s, which was really not a good strategy. What
-I ended with was keep the timer reference in a state variable, and reading that from the test. It
-might not be great to reach into the internals of a structure in a test, but the alternative is
-waiting a very long time in the test suite. I ended up being okay with this tradeoff for the
-delayed push test, as I could easily make it run in less time by changing from 300ms to
-something else.&lt;/p&gt;
-
-&lt;p&gt;You can find the implementation that satisfies these tests &lt;a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/lib/websocket_demo_web/channels/demo_channel.ex" target="_blank"&gt;here&lt;/a&gt;.&lt;/p&gt;
-
-&lt;h2&gt;Behind the scenes, what is a websocket?&lt;/h2&gt;
-
-&lt;p&gt;The real purpose of this post is to explore what a websocket is. Specifically, what
-is happening when connection, pushes, and responses happen. Let&amp;rsquo;s start by looking at
-the process structure for when a websocket is created. I will do this by opening
-&lt;code&gt;:observer.start&lt;/code&gt; and looking at the difference when a socket is created.&lt;/p&gt;
-
-&lt;div style="text-align: center"&gt;
-  &lt;img src="/images/websocket-dive/one-socket.png" alt="one socket appears in the process tree" /&gt;
-  &lt;div&gt;
-    &lt;small&gt;
-      &lt;i&gt;The rightmost process is the websocket process&lt;/i&gt;
-    &lt;/small&gt;
-  &lt;/div&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Above, the pid &lt;0.369.0&gt; is the websocket process. This is possible to visualize by
-clicking on that process and viewing the state. It shows the websocket internal state.&lt;/p&gt;
-
-&lt;div style="text-align: center"&gt;
-  &lt;img src="/images/websocket-dive/369-socket.png" alt="pid 369 appears clearly as the socket" /&gt;
-  &lt;div&gt;
-    &lt;small&gt;
-      &lt;i&gt;It is possible to view the Socket struct in the state information&lt;/i&gt;
-    &lt;/small&gt;
-  &lt;/div&gt;
-&lt;/div&gt;
-
-&lt;p&gt;One interesting thing about this pid is that it appears in the state itself, as the
-&lt;code&gt;channel_pid&lt;/code&gt; key of the Elixir.Phoenix.Socket struct. As if seeing the process in
-observer is not enough, this gives the proof that the channel is a process.&lt;/p&gt;
-
-&lt;p&gt;Also in the process state is a second pid called &lt;code&gt;transport_pid&lt;/code&gt;. This process is where
-the actual websocket protocol occurs.&lt;/p&gt;
-
-&lt;div style="text-align: center"&gt;
-  &lt;img src="/images/websocket-dive/transport-process.png" alt="the transport process information" /&gt;
-  &lt;div&gt;
-    &lt;small&gt;
-      &lt;i&gt;The transport process is the parent of the channel process&lt;/i&gt;
-    &lt;/small&gt;
-  &lt;/div&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Internally, there is a &lt;a href="https://github.com/phoenixframework/phoenix/blob/master/lib/phoenix/channel/server.ex#L186" target="_blank"&gt;&lt;code&gt;Phoenix.Channel.Server&lt;/code&gt;&lt;/a&gt;
-GenServer which wraps around the behavior of the defined channel. I initially thought
-that saying &lt;code&gt;use Phoenix.Channel&lt;/code&gt; would cause the channel to become a GenServer, but
-that is proved false by seeing that the Phoenix.Channel.Server implementation sets
-&lt;code&gt;channel_pid: self()&lt;/code&gt;. I won&amp;rsquo;t dig into this server implementation today.&lt;/p&gt;
-
-&lt;p&gt;I also won&amp;rsquo;t dig into the cowboy code, but we can see that the actual websocket
-implementation happens at the cowboy level via &lt;a href="https://ninenines.eu/docs/en/cowboy/2.0/manual/cowboy_websocket/" target="_blank"&gt;cowboy_websocket&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;Finally, the PubSub.Local0 process is monitoring the channel process. I am going to leave
-this implementation up for another blog post, or as an exercise for you.&lt;/p&gt;
-
-&lt;h2&gt;Websocket messages&lt;/h2&gt;
-
-&lt;p&gt;Google Chrome provides functionality to view what a websocket is doing. This can be
-accessed by finding the websocket in the Network tab. The websocket request has a
-&amp;ldquo;frames&amp;rdquo; inner section. When you view this, you may need to drag down the &amp;ldquo;select a frame&amp;rdquo;
-content to view the frames themselves.&lt;/p&gt;
-
-&lt;div style="text-align: center"&gt;
-  &lt;img src="/images/websocket-dive/frontend-messages.png" alt="frontend message frames" /&gt;
-  &lt;div&gt;
-    &lt;small&gt;
-      &lt;i&gt;The in/out of the client websocket&lt;/i&gt;
-    &lt;/small&gt;
-  &lt;/div&gt;
-&lt;/div&gt;
-
-&lt;p&gt;When a message is pushed from the JS client to the backend, it sends the request in the format
-&lt;code&gt;[join_ref, message_ref, topic, message, payload]&lt;/code&gt;. The join&lt;em&gt;ref and message&lt;/em&gt;ref are actually
-really important. These are used in the response (same format as the request) to allow calling
-back to the right function. Phoenix provides the &lt;code&gt;reply&lt;/code&gt; function to reply to a &lt;code&gt;socket_ref&lt;/code&gt;.
-The demo uses this to &lt;a href="https://github.com/sb8244/websocket-demo/blob/66b7933157be16b4e6d03ab08e21fc9b9841882d/lib/websocket_demo_web/channels/demo_channel.ex#L26" target="_blank"&gt;reply asynchronously&lt;/a&gt;
-to requests. Asynchronous replies must happen within the channel timeout period (10s default). A
-timeout event will trigger if it is not in that timeframe. It is possible to override this timeframe
-to be whatever you need for your use case.&lt;/p&gt;
-
-&lt;p&gt;The two refs can be null, as seen for the tick message. This will cause it to
-be a global message handler rather than a local one.&lt;/p&gt;
-
-&lt;h2&gt;What are the benefits of a channel / transport process?&lt;/h2&gt;
-
-&lt;p&gt;The process structure of Phoenix websockets is one of the things that helps make it
-fault tolerant. Let&amp;rsquo;s say that something goes wrong with the channel process and causes
-it to crash. The process will be started back up from the supervisor, causing the
-&lt;code&gt;join&lt;/code&gt; function to be called (triggering any join callbacks on the client). However,
-the channel crash does not cause the client to see any fault in the socket it has.&lt;/p&gt;
-
-&lt;p&gt;If the transport process crashes, the client sees a disconnection and will try to reconnect.
-The channel process also restarts, because it is a child of the transport process. In this
-scenario, the system ends in a stable operating state.&lt;/p&gt;
-
-&lt;p&gt;A benefit of the channel process is that the process can be controlled like any other process.
-It can handle messages via a &lt;code&gt;handle_info&lt;/code&gt; callback, which the demo uses to create a
-tick every 5 seconds. It can also store arbitrary state (best practice is the assigns
-map) which can be used to like any other GenServer state.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;I have a few different things that are more advanced than an intro to websocket post. My
-current ideas are how to debounce a websocket push (push once every X seconds) and also
-what happens to setup the websocket requests.&lt;/p&gt;
-
-&lt;p&gt;Thanks for reading the 10th post in my 28 days of Elixir. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
 really want to see!&lt;/p&gt;
