@@ -1,0 +1,176 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - 28 Days - Exploring Elixir Map access</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>28 Days - Exploring Elixir Map access</h1>
+      <p>I missed a day&hellip;damn. I did have a great day with my dad before he left to go home,
+so I&rsquo;m letting it slide. I have a last minute trip coming up as well, so I&rsquo;ll be working
+extra hard over the next few days to come up with some ideas and execute on them while
+flying over the pond to Spain.</p>
+
+<p>Today, I want to dive deep into a common part of Elixir: map access. This topic is one
+that I have taken for granted until today, and discovering how it is all handled was
+quite an interesting adventure. While the end result of today&rsquo;s post won&rsquo;t be ground
+breaking new ideas, it should give some idea on how I approach a new foreign code base.</p>
+
+<h2>Digging in for the first time (and failing)</h2>
+
+<p>I started this adventure because my co-worker Ben brought up that <a href="https://hexdocs.pm/elixir/Access.html" target="_blank"><code>Access</code></a>
+is an interesting module that we take for granted. Even further than <code>Access</code>, the
+<a href="https://hexdocs.pm/elixir/Kernel.html#get_in/2" target="_blank"><code>Kernel</code></a> module has some interesting
+functions related to access. I have never used these before, but I could see them being
+pretty useful.</p>
+
+<p>I started my journey by pulling down the elixir-lang/elixir github repo. Having this
+locally allows me to do some more powerful searches than Github allows, and also
+works offline. I started with some basic greps for how <code>Access.get</code> is exposed:</p>
+
+<pre><code>➜  elixir git:(master) grep -R &quot;Access\.get(&quot; lib/elixir/lib
+lib/elixir/lib/access.ex:  Internally, `data[key]` translates  to `Access.get(term, key, nil)`.
+lib/elixir/lib/kernel.ex:  def get_in(data, [h]), do: Access.get(data, h)
+lib/elixir/lib/kernel.ex:  def get_in(data, [h | t]), do: get_in(Access.get(data, h), t)
+</code></pre>
+
+<p>Alright. So nothing new is really here. The Elixir language itself only uses <code>Access.get</code>
+via <code>Kernel.get_in/2</code>. Okay&hellip;so let&rsquo;s find out how <code>get_in</code> is used. I&rsquo;ve excluded iex&gt;
+here as that is for docs and wasn&rsquo;t useful for the search:</p>
+
+<pre><code>➜  elixir git:(master) grep -R &quot;get_in(&quot; lib/elixir/lib | grep -v &quot;iex&quot;
+lib/elixir/lib/kernel.ex:  @spec get_in(Access.t(), nonempty_list(term)) :: term
+lib/elixir/lib/kernel.ex:  def get_in(data, keys)
+lib/elixir/lib/kernel.ex:  def get_in(data, [h]) when is_function(h), do: h.(:get, data, &amp; &amp;1)
+lib/elixir/lib/kernel.ex:  def get_in(data, [h | t]) when is_function(h), do: h.(:get, data, &amp;get_in(&amp;1, t))
+lib/elixir/lib/kernel.ex:  def get_in(nil, [_]), do: nil
+lib/elixir/lib/kernel.ex:  def get_in(nil, [_ | t]), do: get_in(nil, t)
+lib/elixir/lib/kernel.ex:  def get_in(data, [h]), do: Access.get(data, h)
+lib/elixir/lib/kernel.ex:  def get_in(data, [h | t]), do: get_in(Access.get(data, h), t)
+</code></pre>
+
+<p>Alright&hellip;.so now I&rsquo;ve hit my dead end. I <em>know</em> that Access.get is what is used for
+accessing a map like <code>map[:key]</code> as the access.ex file documents as such, but I simply
+can&rsquo;t find it.</p>
+
+<h2>Start from beginning</h2>
+
+<p>This is when I remembered something that I saw Chris McCord write in Slack once, he
+likes to use <code>Macro.expand</code> to see what happens when macros are processed. This gives
+the AST that Elixir is going to compile into erlang, so should give a good lead. I&rsquo;ve
+formatted the following to read more easily:</p>
+
+<pre><code>iex(1)&gt; Macro.expand((quote do: (map[:a])), __ENV__)
+{
+  {:., [], [Access, :get]},
+  [],
+  [{:map, [], Elixir}, :a]
+}
+</code></pre>
+
+<p>Okay, this is what we expected to see but also tells us a lot. When <code>map[:a]</code> is
+expanded by the Elixir compiler, somehow Access.get is added in. We can see that this
+also works for <code>map[:a][:b]</code>:</p>
+
+<pre><code>iex(2)&gt; Macro.expand((quote do: (map[:a][:b])), __ENV__)
+{
+  {:., [], [Access, :get]},
+  [],
+  [
+    {
+      {:., [], [Access, :get]},
+      [],
+      [{:map, [], Elixir}, :a]
+    },
+    :b
+  ]
+}
+</code></pre>
+
+<p>This revealed to me that I missed something crucial in searching the Elixir code:
+I didn&rsquo;t search the compiler source code, which lives in <code>lib/elixir/src</code>. Let&rsquo;s try
+a search there:</p>
+
+<pre><code>➜  elixir git:(master) grep -R &quot;Access&quot; lib/elixir/src
+lib/elixir/src/elixir_erl_pass.erl:translate_remote(&#39;Elixir.Access&#39; = Mod, get, Meta, [Container, Value], S) -&gt;
+lib/elixir/src/elixir_parser.yrl:%% Access
+lib/elixir/src/elixir_parser.yrl:  {{&#39;.&#39;, Meta, [&#39;Elixir.Access&#39;, get]}, Meta, [Expr, List]}.
+lib/elixir/src/elixir_rewrite.erl:-define(access, &#39;Elixir.Access&#39;).
+</code></pre>
+
+<p>Ahhhh, there we go. The <a href="https://github.com/elixir-lang/elixir/blame/master/lib/elixir/src/elixir_parser.yrl#L846" target="_blank">Elixir compiler expands on map access</a>.
+We can then follow the dots backwards to get how this is codified:</p>
+
+<ol>
+<li><a href="https://github.com/elixir-lang/elixir/blame/master/lib/elixir/src/elixir_parser.yrl#L280" target="_blank"><code>build_access</code> is used in <code>bracket_expr</code></a></li>
+<li><a href="https://github.com/elixir-lang/elixir/blame/master/lib/elixir/src/elixir_parser.yrl#L238" target="_blank">parser notation for different <code>access_expr</code></a></li>
+<li>Much more parser notation by looking at each variable</li>
+</ol>
+
+<p>I won&rsquo;t pretend to know the parser expressions and how they&rsquo;re put together. I suspect
+that I could spend a lot of time researching that topic in particular. However, at this
+point we have our answer: the bracket expressions are handled by the Elixir compiler, and
+expanded into <code>Access.get</code> calls. They are not handled as normal macros and are engrained
+into the language.</p>
+
+<hr>
+
+<p>Thanks for reading the 17th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to <a href="/tags/28-days-of-elixir.html" target="_blank">28 days of straight writing</a>. I
+am looking for new topics to write about, so please reach out if there&rsquo;s anything you
+really want to see!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/28-days-of-elixir.html">28 days of elixir</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>

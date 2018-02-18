@@ -4,16 +4,140 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-17T02:07:00-05:00</updated>
+  <updated>2018-02-18T12:42:00-08:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
   <entry>
+    <title>28 Days - Exploring Elixir Map access</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/02/18/exploring-elixir-map-access.html"/>
+    <id>https://stephenbussey.com/2018/02/18/exploring-elixir-map-access.html</id>
+    <published>2018-02-18T12:42:00-08:00</published>
+    <updated>2018-02-18T13:08:49-08:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I missed a day&amp;hellip;damn. I did have a great day with my dad before he left to go home,
+so I&amp;rsquo;m letting it slide. I have a last minute trip coming up as well, so I&amp;rsquo;ll be working
+extra hard over the next few days to come up with some ideas and execute on them while
+flying over the pond to Spain.&lt;/p&gt;
+
+&lt;p&gt;Today, I want to dive deep into a common part of Elixir: map access. This topic is one
+that I have taken for granted until today, and discovering how it is all handled was
+quite an interesting adventure. While the end result of today&amp;rsquo;s post won&amp;rsquo;t be ground
+breaking new ideas, it should give some idea on how I approach a new foreign code base.&lt;/p&gt;
+
+&lt;h2&gt;Digging in for the first time (and failing)&lt;/h2&gt;
+
+&lt;p&gt;I started this adventure because my co-worker Ben brought up that &lt;a href="https://hexdocs.pm/elixir/Access.html" target="_blank"&gt;&lt;code&gt;Access&lt;/code&gt;&lt;/a&gt;
+is an interesting module that we take for granted. Even further than &lt;code&gt;Access&lt;/code&gt;, the
+&lt;a href="https://hexdocs.pm/elixir/Kernel.html#get_in/2" target="_blank"&gt;&lt;code&gt;Kernel&lt;/code&gt;&lt;/a&gt; module has some interesting
+functions related to access. I have never used these before, but I could see them being
+pretty useful.&lt;/p&gt;
+
+&lt;p&gt;I started my journey by pulling down the elixir-lang/elixir github repo. Having this
+locally allows me to do some more powerful searches than Github allows, and also
+works offline. I started with some basic greps for how &lt;code&gt;Access.get&lt;/code&gt; is exposed:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;➜  elixir git:(master) grep -R &amp;quot;Access\.get(&amp;quot; lib/elixir/lib
+lib/elixir/lib/access.ex:  Internally, `data[key]` translates  to `Access.get(term, key, nil)`.
+lib/elixir/lib/kernel.ex:  def get_in(data, [h]), do: Access.get(data, h)
+lib/elixir/lib/kernel.ex:  def get_in(data, [h | t]), do: get_in(Access.get(data, h), t)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Alright. So nothing new is really here. The Elixir language itself only uses &lt;code&gt;Access.get&lt;/code&gt;
+via &lt;code&gt;Kernel.get_in/2&lt;/code&gt;. Okay&amp;hellip;so let&amp;rsquo;s find out how &lt;code&gt;get_in&lt;/code&gt; is used. I&amp;rsquo;ve excluded iex&amp;gt;
+here as that is for docs and wasn&amp;rsquo;t useful for the search:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;➜  elixir git:(master) grep -R &amp;quot;get_in(&amp;quot; lib/elixir/lib | grep -v &amp;quot;iex&amp;quot;
+lib/elixir/lib/kernel.ex:  @spec get_in(Access.t(), nonempty_list(term)) :: term
+lib/elixir/lib/kernel.ex:  def get_in(data, keys)
+lib/elixir/lib/kernel.ex:  def get_in(data, [h]) when is_function(h), do: h.(:get, data, &amp;amp; &amp;amp;1)
+lib/elixir/lib/kernel.ex:  def get_in(data, [h | t]) when is_function(h), do: h.(:get, data, &amp;amp;get_in(&amp;amp;1, t))
+lib/elixir/lib/kernel.ex:  def get_in(nil, [_]), do: nil
+lib/elixir/lib/kernel.ex:  def get_in(nil, [_ | t]), do: get_in(nil, t)
+lib/elixir/lib/kernel.ex:  def get_in(data, [h]), do: Access.get(data, h)
+lib/elixir/lib/kernel.ex:  def get_in(data, [h | t]), do: get_in(Access.get(data, h), t)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Alright&amp;hellip;.so now I&amp;rsquo;ve hit my dead end. I &lt;em&gt;know&lt;/em&gt; that Access.get is what is used for
+accessing a map like &lt;code&gt;map[:key]&lt;/code&gt; as the access.ex file documents as such, but I simply
+can&amp;rsquo;t find it.&lt;/p&gt;
+
+&lt;h2&gt;Start from beginning&lt;/h2&gt;
+
+&lt;p&gt;This is when I remembered something that I saw Chris McCord write in Slack once, he
+likes to use &lt;code&gt;Macro.expand&lt;/code&gt; to see what happens when macros are processed. This gives
+the AST that Elixir is going to compile into erlang, so should give a good lead. I&amp;rsquo;ve
+formatted the following to read more easily:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;iex(1)&amp;gt; Macro.expand((quote do: (map[:a])), __ENV__)
+{
+  {:., [], [Access, :get]},
+  [],
+  [{:map, [], Elixir}, :a]
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Okay, this is what we expected to see but also tells us a lot. When &lt;code&gt;map[:a]&lt;/code&gt; is
+expanded by the Elixir compiler, somehow Access.get is added in. We can see that this
+also works for &lt;code&gt;map[:a][:b]&lt;/code&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;iex(2)&amp;gt; Macro.expand((quote do: (map[:a][:b])), __ENV__)
+{
+  {:., [], [Access, :get]},
+  [],
+  [
+    {
+      {:., [], [Access, :get]},
+      [],
+      [{:map, [], Elixir}, :a]
+    },
+    :b
+  ]
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This revealed to me that I missed something crucial in searching the Elixir code:
+I didn&amp;rsquo;t search the compiler source code, which lives in &lt;code&gt;lib/elixir/src&lt;/code&gt;. Let&amp;rsquo;s try
+a search there:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;➜  elixir git:(master) grep -R &amp;quot;Access&amp;quot; lib/elixir/src
+lib/elixir/src/elixir_erl_pass.erl:translate_remote(&amp;#39;Elixir.Access&amp;#39; = Mod, get, Meta, [Container, Value], S) -&amp;gt;
+lib/elixir/src/elixir_parser.yrl:%% Access
+lib/elixir/src/elixir_parser.yrl:  {{&amp;#39;.&amp;#39;, Meta, [&amp;#39;Elixir.Access&amp;#39;, get]}, Meta, [Expr, List]}.
+lib/elixir/src/elixir_rewrite.erl:-define(access, &amp;#39;Elixir.Access&amp;#39;).
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Ahhhh, there we go. The &lt;a href="https://github.com/elixir-lang/elixir/blame/master/lib/elixir/src/elixir_parser.yrl#L846" target="_blank"&gt;Elixir compiler expands on map access&lt;/a&gt;.
+We can then follow the dots backwards to get how this is codified:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;a href="https://github.com/elixir-lang/elixir/blame/master/lib/elixir/src/elixir_parser.yrl#L280" target="_blank"&gt;&lt;code&gt;build_access&lt;/code&gt; is used in &lt;code&gt;bracket_expr&lt;/code&gt;&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/elixir-lang/elixir/blame/master/lib/elixir/src/elixir_parser.yrl#L238" target="_blank"&gt;parser notation for different &lt;code&gt;access_expr&lt;/code&gt;&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Much more parser notation by looking at each variable&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;I won&amp;rsquo;t pretend to know the parser expressions and how they&amp;rsquo;re put together. I suspect
+that I could spend a lot of time researching that topic in particular. However, at this
+point we have our answer: the bracket expressions are handled by the Elixir compiler, and
+expanded into &lt;code&gt;Access.get&lt;/code&gt; calls. They are not handled as normal macros and are engrained
+into the language.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;Thanks for reading the 17th post in my 28 days of Elixir. Keep up through the month of February to see if I can
+stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
+am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
+really want to see!&lt;/p&gt;
+</content>
+  </entry>
+  <entry>
     <title>28 Days - pg2 basics - Use process groups for orchestration across a cluster</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/17/pg2-basics-use-process-groups-for-orchestration-across-a-cluster.html"/>
     <id>https://stephenbussey.com/2018/02/17/pg2-basics-use-process-groups-for-orchestration-across-a-cluster.html</id>
-    <published>2018-02-17T02:07:00-05:00</published>
-    <updated>2018-02-17T03:13:06-05:00</updated>
+    <published>2018-02-16T23:07:00-08:00</published>
+    <updated>2018-02-17T00:13:06-08:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -133,8 +257,8 @@ really want to see!&lt;/p&gt;
     <title>28 Days - My favorite Elixir testing tool - Mockery</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/15/my-favorite-elixir-testing-tool-mockery.html"/>
     <id>https://stephenbussey.com/2018/02/15/my-favorite-elixir-testing-tool-mockery.html</id>
-    <published>2018-02-15T18:23:00-05:00</published>
-    <updated>2018-02-15T20:33:13-05:00</updated>
+    <published>2018-02-15T15:23:00-08:00</published>
+    <updated>2018-02-15T17:33:13-08:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -267,8 +391,8 @@ really want to see!&lt;/p&gt;
     <title>28 Days - Intro to Elixir Enumerable</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/15/intro-to-elixir-enumerable.html"/>
     <id>https://stephenbussey.com/2018/02/15/intro-to-elixir-enumerable.html</id>
-    <published>2018-02-15T01:41:00-05:00</published>
-    <updated>2018-02-15T02:27:26-05:00</updated>
+    <published>2018-02-14T22:41:00-08:00</published>
+    <updated>2018-02-14T23:27:26-08:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -375,8 +499,8 @@ really want to see!&lt;/p&gt;
     <title>28 Days - Talk Recap - Elixir in Production</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/14/talk-recap-elixir-in-production.html"/>
     <id>https://stephenbussey.com/2018/02/14/talk-recap-elixir-in-production.html</id>
-    <published>2018-02-13T21:01:00-05:00</published>
-    <updated>2018-02-15T02:24:10-05:00</updated>
+    <published>2018-02-13T18:01:00-08:00</published>
+    <updated>2018-02-14T23:24:10-08:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -455,8 +579,8 @@ really want to see!&lt;/p&gt;
     <title>28 Days - Debounce websocket messages</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/13/debounce-websocket-messages.html"/>
     <id>https://stephenbussey.com/2018/02/13/debounce-websocket-messages.html</id>
-    <published>2018-02-12T23:09:00-05:00</published>
-    <updated>2018-02-12T23:53:43-05:00</updated>
+    <published>2018-02-12T20:09:00-08:00</published>
+    <updated>2018-02-12T20:53:43-08:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -522,88 +646,6 @@ even be opportunity to turn something like this into a library which can be used
 more general purpose.&lt;/p&gt;
 
 &lt;p&gt;Thanks for reading the 12th post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
-really want to see!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 days - Phoenix websocket HTTP breakdown</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/12/phoenix-websocket-http-breakdown.html"/>
-    <id>https://stephenbussey.com/2018/02/12/phoenix-websocket-http-breakdown.html</id>
-    <published>2018-02-11T20:01:00-05:00</published>
-    <updated>2018-02-11T20:26:52-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;This post is coming right on the heels of a &lt;a href="/2018/02/10/phoenix-websocket-dive.html" target="_blank"&gt;websocket post&lt;/a&gt; written yesterday.
-While that post handled what a channel looks like when Phoenix websockets are used,
-it doesn&amp;rsquo;t cover much of how Phoenix operates under the hood.&lt;/p&gt;
-
-&lt;p&gt;This topic came up as I was trying to figure out how to put a plug in front of
-the websocket connection, in order to have custom origin validation code. I was
-surprised that I cannot put a plug in front of it, as it&amp;rsquo;s not part of the typical
-Phoenix path.&lt;/p&gt;
-
-&lt;h2&gt;Websocket HTTP Request&lt;/h2&gt;
-
-&lt;p&gt;When a client connects to a websocket server, the initial connection is
-done as http, followed by protocol switching to ws (or https/wss). This web request
-does the &lt;a href="https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers#The_WebSocket_Handshake" target="_blank"&gt;websocket handshake&lt;/a&gt;
-and ends with a connected websocket. It is possible to make this request yourself using curl (right click websocket request
-in Chrome and &amp;ldquo;copy as curl&amp;rdquo;), although you will end up with a 400 bad request.&lt;/p&gt;
-
-&lt;p&gt;As this is just a web request, we can be pretty confident that Phoenix is going to handle
-it. My first thought was to figure out what the &lt;code&gt;socket&lt;/code&gt; macro in Phoenix.Endpoint
-does.&lt;/p&gt;
-
-&lt;h2&gt;Phoenix Setup&lt;/h2&gt;
-
-&lt;p&gt;&lt;a href="https://github.com/phoenixframework/phoenix/blob/7c67edeec4e877b71a54606db33fa650e9819ca7/lib/phoenix/endpoint.ex#L754" target="_blank"&gt;&lt;code&gt;Phoenix.Endpoint&lt;/code&gt;&lt;/a&gt;
-exposes a socket macro that adds the path and module to a module attribute. This
-attribute is exposed as &lt;code&gt;__sockets__/0&lt;/code&gt; on the endpoint implementation.&lt;/p&gt;
-
-&lt;p&gt;Next up, we can look at where &lt;code&gt;__sockets__&lt;/code&gt; is referenced in the Phoenix codebase:&lt;/p&gt;
-
-&lt;div style="text-align: center"&gt;
-  &lt;img src="/images/socket-http/socket-search.png" alt="__sockets__ usage from Github" /&gt;
-  &lt;div&gt;
-    &lt;small&gt;
-      &lt;i&gt;There are only 2 users of the sockets function&lt;/i&gt;
-    &lt;/small&gt;
-  &lt;/div&gt;
-&lt;/div&gt;
-
-&lt;p&gt;I checked my version of cowboy in mix.lock to find out that I&amp;rsquo;m on cowboy 1. So let&amp;rsquo;s
-dive into that code.&lt;/p&gt;
-
-&lt;p&gt;The &lt;a href="https://github.com/phoenixframework/phoenix/blob/78bb8f1e5b5fab094a6fe4d8bdc3ce7cd4a55da2/lib/phoenix/endpoint/cowboy_handler.ex#L89" target="_blank"&gt;cowboy_handler&lt;/a&gt;
-is where the actual cowboy server gets started up. It&amp;rsquo;s important to pass in the right
-dispatches, which execute the web logic. We can see that a custom socket based dispatch
-is created for every socket defined in the endpoint. Here is what my dispatch looked like
-for the repo in the previous post:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;[
-  {&amp;quot;/socket/websocket&amp;quot;, Phoenix.Endpoint.CowboyWebSocket,
-   {Phoenix.Transports.WebSocket,
-    {WebsocketDemoWeb.Endpoint, WebsocketDemoWeb.DemoSocket, :websocket}}}
-]
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Finally, the &lt;a href="https://github.com/phoenixframework/phoenix/blob/78bb8f1e5b5fab094a6fe4d8bdc3ce7cd4a55da2/lib/phoenix/endpoint/cowboy_websocket.ex#L9" target="_blank"&gt;&lt;code&gt;CowboyWebSocket&lt;/code&gt;&lt;/a&gt;
-handles the actual websocket request, utilizing the &lt;code&gt;Phoenix.Transports.Websocket&lt;/code&gt; module
-to do the heavy lifting of deciding if the connection is allowed or not.&lt;/p&gt;
-
-&lt;p&gt;The &lt;a href="https://github.com/phoenixframework/phoenix/blob/78bb8f1e5b5fab094a6fe4d8bdc3ce7cd4a55da2/lib/phoenix/transports/websocket.ex#L85" target="_blank"&gt;&lt;code&gt;Transports.Websocket&lt;/code&gt;&lt;/a&gt;
-module is what checks the origin and decides whether the websocket is allowed or
-not. All of the code up until this point has been entirely within Phoenix&amp;rsquo;s framework,
-without any clear cut place to hook into. Thus, I came to the conclusion that
-I can&amp;rsquo;t just shimmy some new &lt;code&gt;check_origin&lt;/code&gt; logic into the code path. Ah well,
-at least there was good learning.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;Thanks for reading the 11th post in my 28 days of Elixir. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
 really want to see!&lt;/p&gt;
