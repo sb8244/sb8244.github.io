@@ -4,16 +4,106 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-02-25T18:42:00+01:00</updated>
+  <updated>2018-04-16T21:53:00-04:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
   <entry>
+    <title>Introducing Elixir Response Snapshot Testing</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/04/17/introducing-elixir-response-snapshot-testing.html"/>
+    <id>https://stephenbussey.com/2018/04/17/introducing-elixir-response-snapshot-testing.html</id>
+    <published>2018-04-16T21:53:00-04:00</published>
+    <updated>2018-04-16T23:13:23-04:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I&amp;rsquo;m excited to introduce an Elixir testing library that I&amp;rsquo;ve been working on, as well
+as to explain the general ideas behind it. The library is called Response Snapshot and
+can be found on &lt;a href="https://hex.pm/packages/response_snapshot" target="_blank"&gt;hex&lt;/a&gt;. The work is based on
+my &lt;a href="https://github.com/SalesLoft/rspec-rcv" target="_blank"&gt;rspec-rcv&lt;/a&gt; gem which provides a very similar
+interface and seeks to achieve the same goals.&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://hex.pm/packages/response_snapshot" target="_blank"&gt;hex.pm&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/sb8244/elixir_response_snapshot" target="_blank"&gt;github.com&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h1&gt;What is snapshot testing?&lt;/h1&gt;
+
+&lt;p&gt;I&amp;rsquo;m borrowing this term from Jest, but I think that the concept is fairly simple
+and true to the name. Snapshot testing is testing an API response by collecting
+a valid snapshot of the output and comparing future tests against it. The entire
+API response can be asserted against with a single line of code, and visually verified
+as correct by a human.&lt;/p&gt;
+
+&lt;p&gt;In addition to being able to quickly test response outputs and ensure their shape
+doesn&amp;rsquo;t change over time, the snapshots can be utilized by frontend specs or other
+client systems as an example of valid output. If the frontend specs always use the
+most recent snapshots, any changes to the backend which would break the frontend
+should fail when the frontend specs run.&lt;/p&gt;
+
+&lt;h1&gt;Where does snapshot testing fall short?&lt;/h1&gt;
+
+&lt;p&gt;I would hazard a guess that the idea of snapshot testing makes TDD practitioners
+cringe a bit. In particular, a human has to verify that the snapshot is accurate
+and then commit that into source control. Humans are prone to errors and so this
+could be considered worse than standard tests on a response. I do think that there
+is a place for response assertions in addition to a snapshot, although snapshots
+significantly lower the barrier to entry on testing responses. Without snapshot testing,
+the tests for a response can end up being long, redundant, and a chore to update.&lt;/p&gt;
+
+&lt;p&gt;One of the big challenges in snapshot testing is handling values that change between
+test runs. This is really common with ids, dates, and information generated from
+a library like faker. ResponseSnapshot introduces an optional &lt;code&gt;:keys&lt;/code&gt; mode which
+will not error out if any values are modified. This is most useful when the shape
+of the data should be asserted, but not the exact values. Addition and removal of
+keys would be an error in this mode. Another solution to avoid using keys mode is
+ignored keys. With this, specific path value changes can be ignored. Paths can be
+absolute or wildcards.&lt;/p&gt;
+
+&lt;h1&gt;Getting started in Elixir&lt;/h1&gt;
+
+&lt;p&gt;To get started in Elixir, follow the &lt;a href="https://github.com/sb8244/elixir_response_snapshot#installation" target="_blank"&gt;installation instructions&lt;/a&gt;.
+Capturing your first test involves invoking &lt;code&gt;store_and_compare!/2&lt;/code&gt;. Let&amp;rsquo;s see an
+example:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;test &amp;quot;widgets are listed out&amp;quot;, %{conn: conn} do
+  conn
+  |&amp;gt; get(&amp;quot;/api/widgets&amp;quot;)
+  |&amp;gt; json_response(200)
+  |&amp;gt; ResponseSnapshot.store_and_compare!(path: &amp;quot;widgets/index.json&amp;quot;)
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In practice, you will want to setup your fixture path base and ignore keys that
+change between test runs (such as ids and dates):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;config :response_snapshot,
+  path_base: &amp;quot;test/fixtures&amp;quot;,
+  ignored_keys: [
+    {&amp;quot;id&amp;quot;, :any_nesting},
+    {&amp;quot;created_at&amp;quot;, :any_nesting},
+  ]
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The output of the test run will be a fixture file located at &lt;code&gt;test/fixtures/widgets/index.json&lt;/code&gt;.
+This file will include the test file path, the recording time, and the JSON response
+of the API.&lt;/p&gt;
+
+&lt;h1&gt;Next steps&lt;/h1&gt;
+
+&lt;p&gt;For next steps, I&amp;rsquo;d like to bring some best practices to the library, such as using
+Dialyzer. However, the core of the library seems to be operating as expected and includes
+a lot of lessons learned from rspec-rcv over the past 2 years. Please reach out
+on Github issues if you see anything you&amp;rsquo;d like fixed or have any questions!&lt;/p&gt;
+</content>
+  </entry>
+  <entry>
     <title>Writing Break</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/25/writing-break.html"/>
     <id>https://stephenbussey.com/2018/02/25/writing-break.html</id>
-    <published>2018-02-25T18:42:00+01:00</published>
-    <updated>2018-02-25T18:43:44+01:00</updated>
+    <published>2018-02-25T12:42:00-05:00</published>
+    <updated>2018-02-25T12:43:44-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -31,8 +121,8 @@ to establish a new cadence in the upcoming weeks to get these posts out.&lt;/p&g
     <title>28 Days - Exploring Elixir Map access</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/18/exploring-elixir-map-access.html"/>
     <id>https://stephenbussey.com/2018/02/18/exploring-elixir-map-access.html</id>
-    <published>2018-02-18T21:42:00+01:00</published>
-    <updated>2018-02-18T22:08:49+01:00</updated>
+    <published>2018-02-18T15:42:00-05:00</published>
+    <updated>2018-02-18T16:08:49-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -155,8 +245,8 @@ really want to see!&lt;/p&gt;
     <title>28 Days - pg2 basics - Use process groups for orchestration across a cluster</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/17/pg2-basics-use-process-groups-for-orchestration-across-a-cluster.html"/>
     <id>https://stephenbussey.com/2018/02/17/pg2-basics-use-process-groups-for-orchestration-across-a-cluster.html</id>
-    <published>2018-02-17T08:07:00+01:00</published>
-    <updated>2018-02-17T09:13:06+01:00</updated>
+    <published>2018-02-17T02:07:00-05:00</published>
+    <updated>2018-02-17T03:13:06-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -276,8 +366,8 @@ really want to see!&lt;/p&gt;
     <title>28 Days - My favorite Elixir testing tool - Mockery</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/15/my-favorite-elixir-testing-tool-mockery.html"/>
     <id>https://stephenbussey.com/2018/02/15/my-favorite-elixir-testing-tool-mockery.html</id>
-    <published>2018-02-16T00:23:00+01:00</published>
-    <updated>2018-02-16T02:33:13+01:00</updated>
+    <published>2018-02-15T18:23:00-05:00</published>
+    <updated>2018-02-15T20:33:13-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -410,8 +500,8 @@ really want to see!&lt;/p&gt;
     <title>28 Days - Intro to Elixir Enumerable</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/02/15/intro-to-elixir-enumerable.html"/>
     <id>https://stephenbussey.com/2018/02/15/intro-to-elixir-enumerable.html</id>
-    <published>2018-02-15T07:41:00+01:00</published>
-    <updated>2018-02-15T08:27:26+01:00</updated>
+    <published>2018-02-15T01:41:00-05:00</published>
+    <updated>2018-02-15T02:27:26-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -509,86 +599,6 @@ C code like you may need to in other languages. The best answers to your questio
 curiosities are found in the code itself.&lt;/p&gt;
 
 &lt;p&gt;Thanks for reading the 14th post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
-really want to see!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 Days - Talk Recap - Elixir in Production</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/14/talk-recap-elixir-in-production.html"/>
-    <id>https://stephenbussey.com/2018/02/14/talk-recap-elixir-in-production.html</id>
-    <published>2018-02-14T03:01:00+01:00</published>
-    <updated>2018-02-15T08:24:10+01:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I very recently gave a talk at the Atlanta Elixir Meetup called &amp;ldquo;Elixir in Production&amp;rdquo;.
-The talk was fairly broad, but focused on what is needed to talk Elixir into production
-from both a personal and technical standpoint.&lt;/p&gt;
-
-&lt;div style="text-align: center"&gt;
-  &lt;iframe
-    width="560"
-    height="315"
-    src="https://www.youtube.com/embed/sdqct3uN6ZU"
-    frameborder="0"
-    allow="encrypted-media"
-    allowfullscreen&gt;
-  &lt;/iframe&gt;
-  &lt;div&gt;
-    &lt;small&gt;
-      &lt;i&gt;Recording of the Atlanta Meetup&lt;/i&gt;
-    &lt;/small&gt;
-  &lt;/div&gt;
-&lt;/div&gt;
-
-&lt;h2&gt;Human Element&lt;/h2&gt;
-
-&lt;p&gt;One of the prevailing messages that I focus on is that the decision to use a
-technology is not just about working out technical challenges and mastering
-the technology over time. Rather, I think that the &amp;ldquo;human element&amp;rdquo; needs to
-be considered early and often.&lt;/p&gt;
-
-&lt;p&gt;As an overarching theme, empathy and caring for others on the team is crucial.
-All objectives and goals should keep the engineers on the team in mind. Questions like
-&amp;ldquo;how will this affect my day to day&amp;rdquo; or &amp;ldquo;what mentorship will be available for me&amp;rdquo;
-should be considered in putting together any timelines.&lt;/p&gt;
-
-&lt;p&gt;In order to establish a healthy level of expertise and mentorship, I break down
-two distinct roles which are useful in rolling out a new language: champions and helpers.
-The champion (1-2 per team) are going to focus on overcoming any obstacles to roll out the
-new technology. Champions are people who can stand to be interrupted to help out others
-on the team. On top of champions, helpers who help out with questions and expertise
-are established as the technology is implemented.&lt;/p&gt;
-
-&lt;p&gt;As team members gain knowledge, expertise, and motivation behind the new tech, critical
-mass can be established. Use this to accelerate the objectives and bring more team members
-into the mix.&lt;/p&gt;
-
-&lt;h2&gt;Tech Element&lt;/h2&gt;
-
-&lt;p&gt;Of course, the human element isn&amp;rsquo;t everything. There is ideation, implementation, and maintenance
-to be conquered in bringing Elixir to the organization.&lt;/p&gt;
-
-&lt;p&gt;Existing technology requirements should be considered early. In established technology stacks,
-some pieces are going to be non-negotiable. There may be proprietary authentication systems,
-databases, etc which need to be integrated with from day 1. Knowing about these and planning
-for them early, rather than by surprise later, may help speed along the process.&lt;/p&gt;
-
-&lt;p&gt;I have really enjoyed two different articles by Hamidreza Soleimani:
-&lt;a href="https://hamidreza-s.github.io/erlang/scheduling/real-time/preemptive/migration/2016/02/09/erlang-scheduler-details.html" target="_blank"&gt;Erlang Scheduler Details and Why It Matters&lt;/a&gt; and
-&lt;a href="https://hamidreza-s.github.io/erlang%20garbage%20collection%20memory%20layout%20soft%20realtime/2015/08/24/erlang-garbage-collection-details-and-why-it-matters.html" target="_blank"&gt;Erlang Garbage Collection Details and Why It Matters&lt;/a&gt;. I found both of these posts to be among the best in terms of
-understanding core parts of the erlang runtime.&lt;/p&gt;
-
-&lt;p&gt;Finally, there are operational needs from deploying the app to maintaining it in production.
-These differ greatly based on an organization, but there are some clear patterns that win out
-in Elixir. Whatever you end up with, I would expect high upfront cost followed by quicker
-times in the future.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;Thanks for reading the 13th post in my 28 days of Elixir. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
 really want to see!&lt;/p&gt;

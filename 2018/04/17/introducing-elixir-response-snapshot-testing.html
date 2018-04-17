@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Introducing Elixir Response Snapshot Testing</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>Introducing Elixir Response Snapshot Testing</h1>
+      <p>I&rsquo;m excited to introduce an Elixir testing library that I&rsquo;ve been working on, as well
+as to explain the general ideas behind it. The library is called Response Snapshot and
+can be found on <a href="https://hex.pm/packages/response_snapshot" target="_blank">hex</a>. The work is based on
+my <a href="https://github.com/SalesLoft/rspec-rcv" target="_blank">rspec-rcv</a> gem which provides a very similar
+interface and seeks to achieve the same goals.</p>
+
+<ul>
+<li><a href="https://hex.pm/packages/response_snapshot" target="_blank">hex.pm</a></li>
+<li><a href="https://github.com/sb8244/elixir_response_snapshot" target="_blank">github.com</a></li>
+</ul>
+
+<h1>What is snapshot testing?</h1>
+
+<p>I&rsquo;m borrowing this term from Jest, but I think that the concept is fairly simple
+and true to the name. Snapshot testing is testing an API response by collecting
+a valid snapshot of the output and comparing future tests against it. The entire
+API response can be asserted against with a single line of code, and visually verified
+as correct by a human.</p>
+
+<p>In addition to being able to quickly test response outputs and ensure their shape
+doesn&rsquo;t change over time, the snapshots can be utilized by frontend specs or other
+client systems as an example of valid output. If the frontend specs always use the
+most recent snapshots, any changes to the backend which would break the frontend
+should fail when the frontend specs run.</p>
+
+<h1>Where does snapshot testing fall short?</h1>
+
+<p>I would hazard a guess that the idea of snapshot testing makes TDD practitioners
+cringe a bit. In particular, a human has to verify that the snapshot is accurate
+and then commit that into source control. Humans are prone to errors and so this
+could be considered worse than standard tests on a response. I do think that there
+is a place for response assertions in addition to a snapshot, although snapshots
+significantly lower the barrier to entry on testing responses. Without snapshot testing,
+the tests for a response can end up being long, redundant, and a chore to update.</p>
+
+<p>One of the big challenges in snapshot testing is handling values that change between
+test runs. This is really common with ids, dates, and information generated from
+a library like faker. ResponseSnapshot introduces an optional <code>:keys</code> mode which
+will not error out if any values are modified. This is most useful when the shape
+of the data should be asserted, but not the exact values. Addition and removal of
+keys would be an error in this mode. Another solution to avoid using keys mode is
+ignored keys. With this, specific path value changes can be ignored. Paths can be
+absolute or wildcards.</p>
+
+<h1>Getting started in Elixir</h1>
+
+<p>To get started in Elixir, follow the <a href="https://github.com/sb8244/elixir_response_snapshot#installation" target="_blank">installation instructions</a>.
+Capturing your first test involves invoking <code>store_and_compare!/2</code>. Let&rsquo;s see an
+example:</p>
+
+<pre><code>test &quot;widgets are listed out&quot;, %{conn: conn} do
+  conn
+  |&gt; get(&quot;/api/widgets&quot;)
+  |&gt; json_response(200)
+  |&gt; ResponseSnapshot.store_and_compare!(path: &quot;widgets/index.json&quot;)
+end
+</code></pre>
+
+<p>In practice, you will want to setup your fixture path base and ignore keys that
+change between test runs (such as ids and dates):</p>
+
+<pre><code>config :response_snapshot,
+  path_base: &quot;test/fixtures&quot;,
+  ignored_keys: [
+    {&quot;id&quot;, :any_nesting},
+    {&quot;created_at&quot;, :any_nesting},
+  ]
+</code></pre>
+
+<p>The output of the test run will be a fixture file located at <code>test/fixtures/widgets/index.json</code>.
+This file will include the test file path, the recording time, and the JSON response
+of the API.</p>
+
+<h1>Next steps</h1>
+
+<p>For next steps, I&rsquo;d like to bring some best practices to the library, such as using
+Dialyzer. However, the core of the library seems to be operating as expected and includes
+a lot of lessons learned from rspec-rcv over the past 2 years. Please reach out
+on Github issues if you see anything you&rsquo;d like fixed or have any questions!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
