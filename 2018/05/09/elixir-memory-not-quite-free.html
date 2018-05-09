@@ -1,0 +1,205 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Elixir Memory - Not Quite Free</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>Elixir Memory - Not Quite Free</h1>
+      <p>I have been working on a shipping an Elixir service at SalesLoft to replace an existing
+piece of functionality in our system with a better version. One of the core changes
+is that the websocket communication of this system will be maintained by Elixir rather
+than by Pusher (our Rails goto). This post is going to explore some of the surprises
+and valuable lessons that I gained while debugging memory leaks in the service.</p>
+
+<hr>
+
+<p>I was doing a usual check-in on the service and noticed that the memory for only ~200
+websockets connected was peaking out at over 550MB. This seemed off and meant that
+connecting all users to the service would take many GB of memory. I was at a loss for
+what the problem could be though, but found some help in a useful diagnostic tool.</p>
+
+<h2>Diagnosing Memory Culprit</h2>
+
+<p>When doing local development, it&rsquo;s very easy to pop open <code>:observer.start</code> and get
+a wonderful interface to sift through processes and their memory consumption. However,
+exposing this in production is much more difficult (too difficult in my setup to bother).
+I found the tool <a href="https://github.com/zhongwencool/observer_cli" target="_blank">observer_cli</a> and have to
+say that it is one of the greatest tools in my toolbox right now. It is based on the
+well known <code>recon</code> library, but provides a nice command line interface to visually
+see and sort through process listings. I have to give props to the library maintainer
+for implementing a feature I requested in a matter of days.</p>
+
+<p>As I was looking at the observer_cli output, I noticed that Phoenix Channel Servers were
+appearing all over the top memory utilizers. Some would take up to 4MB, but averaged at about
+1 MB. For 1000 sockets, this would be between 1GB - 4GB of memory!</p>
+
+<h2>Understanding Erlang Memory</h2>
+
+<p>One of my favorite posts on Erlang is by Hamidreza Soleimani, <a href="https://hamidreza-s.github.io/erlang%20garbage%20collection%20memory%20layout%20soft%20realtime/2015/08/24/erlang-garbage-collection-details-and-why-it-matters.html" target="_blank">Erlang Garbage Collection Details</a>.
+This post goes over an important detail of how the 2-part Erlang GC works, young and old generational
+heaps. The gist of it is that the major GC operation can collect both young and old heaps,
+but is invoked infrequently as it is a &ldquo;stop the process&rdquo; type of GC. The minor GC
+operation can only collect young heap items, and will mark items as old if they survive
+a GC pass. What does this mean, though?</p>
+
+<p>In the context of a request, it is possible for an operation to take multiple
+GC minor sweeps and still be referencing all of the allocated binaries (data). When
+this happens, those binaries are going to be marked as old heap and require that
+a full sweep happens to GC them. If the full sweep only happens in certain situations,
+it is possible for the situation to not occur and the full sweep doesn&rsquo;t occur. In
+this case, we have a memory leak. This is exactly what was happening to my websocket.</p>
+
+<p>It is possible to trigger a GC on the entire node to test out if there is a possible
+memory leak. Note that you don&rsquo;t want to do this in a regular fashion and running
+the major GC may make your debugging sessions less valuable until time passes.</p>
+
+<pre><code># don&#39;t do this often
+Process.list() |&gt; Enum.each(&amp;:erlang.garbage_collect/1)
+</code></pre>
+
+<h2>Addressing this Memory Leak</h2>
+
+<p>The websocket request that I&rsquo;ve been discussing was new and a bit different than
+what I&rsquo;ve done in the past. It is an interface to our <a href="https://developers.salesloft.com/api.html" target="_blank">API</a> and allows requests
+to be made on the open connection. Due to it being an API request, it would return
+up to 100 items at a time and require multiple pieces of data sourced from other
+services to operate. This equates to 2 things: memory (1-4 MB) and time (multiple minor sweeps).</p>
+
+<p><a href="https://s3.us-east-2.amazonaws.com/ferd.erlang-in-anger/text.v1.1.0.pdf" target="_blank">Erlang in Anger 7.2.2</a> mentions 5 different ways to fix a memory leak:</p>
+
+<ul>
+<li>call garbage collection manually at given intervals (icky, but somewhat efficient)</li>
+<li>stop using binaries (often not desirable)</li>
+<li>use binary:copy/1-2 if keeping only a small fragment (usually less than 64 bytes) of a larger binary</li>
+<li>move work that involves larger binaries to temporary one-off processes that will die when they’re done (a lesser form of manual GC!)</li>
+<li>or add hibernation calls when appropriate (possibly the cleanest solution for inactive processes)</li>
+</ul>
+
+<p><strong>The above is copied from Erlang in Anger verbatim.</strong></p>
+
+<p>For the work that this websocket request was doing, it made most sense to utilize
+a short lived process to execute and respond to the request.</p>
+
+<p>The initial pass at the fix involved using <code>Task.async</code> and awaiting the response.
+However, this proved to be even worse on memory because sending the response over
+the process barrier was causing the same leak. The solution here ended up being to
+utilize <a href="https://hexdocs.pm/phoenix/Phoenix.Channel.html#socket_ref/1" target="_blank"><code>Phoenix.Channel socket_ref/1</code></a>
+and responding to the socket request in the <code>Task.start</code>d process using <code>Phoenix.Channel.reply(ref, reply)</code>.
+The <code>socket_ref</code> function is very useful and has some nice side effects. Due to
+serialization of processes, the original approach would block access to the socket
+during a request. With the new approach, the socket can handle multiple requests
+at the same time.</p>
+
+<h2>Results from Fix</h2>
+
+<div style="text-align: center">
+  <img src="/images/erlang-memory/step-1.png" alt="memory drop from 550MB to 250MB" />
+  <div>
+    <small>
+      <i>Large fix from short lived process</i>
+    </small>
+  </div>
+</div>
+
+<p>The results from this code change were immediate and apparent. The Phoenix.Channel.Server
+processes that were from 1MB - 4MB were now at 30KB - 60KB. This lead to the massive drop
+in overall memory as seen above.</p>
+
+<h2>Rinse and Repeat</h2>
+
+<p>As more sockets were connected to the system, it became clear there was still a memory
+leak. By utilizing the <code>observer_cli</code> tool, it was possible to see that the cowboy
+websocket processes were hovering at 1-2MB each. Upon discussion in the community Slack, it turns
+out that encoding the large payload suffers from the same type of memory leak that
+was mentioned previously. However, the fix is less optimal due to that code not
+being written by us.</p>
+
+<p>It appeared that triggering a major GC was the best option.
+Phoenix even accommodates this with a special <a href="https://hexdocs.pm/phoenix/Phoenix.Transports.WebSocket.html#module-garbage-collection" target="_blank"><code>:garbage_collect</code></a>
+message handler, which is marked as a solution for use after processing large messages.
+We ended up triggering this 5s after the response of our large payload.</p>
+
+<div style="text-align: center">
+  <img src="/images/erlang-memory/step-2.png" alt="memory drop from 350MB to 210MB" />
+  <div>
+    <small>
+      <i>Large fix from manual GC</i>
+    </small>
+  </div>
+</div>
+
+<p>This memory usage is from significantly more connected sockets than step 1, and we can
+clearly see how large of an impact the manual GC had. The memory is now predictable and
+stable for connected sockets.</p>
+
+<h2>Final Thoughts</h2>
+
+<p>This is a very constrained use case, although possibly common, for memory leaks of
+Phoenix websockets. However, the same principles apply to all of the processes we spawn
+in Elixir. When we have a process, and especially with a large number of processes, it
+is important to think about the life cycle of it and how it will play into garbage collection.
+As our processes become longer lived, this becomes even more important as our systems
+will be leaking memory over longer periods of time.</p>
+
+<p>It seems easiest to just slap a full system GC into every process to keep memory usage
+low (and we can do that if desired), but there are other techniques related to process
+lifecycle and memory consumption that may be more effective in the end.</p>
+
+<p>Again, I recommend reading <a href="https://s3.us-east-2.amazonaws.com/ferd.erlang-in-anger/text.v1.1.0.pdf" target="_blank">Erlang in Anger 5, 7</a>
+and <a href="https://hamidreza-s.github.io/erlang%20garbage%20collection%20memory%20layout%20soft%20realtime/2015/08/24/erlang-garbage-collection-details-and-why-it-matters.html" target="_blank">Erlang Garbage Collection Details</a>
+for more detailed information.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>

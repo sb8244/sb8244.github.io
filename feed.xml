@@ -4,10 +4,164 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-04-16T21:53:00-04:00</updated>
+  <updated>2018-05-08T23:32:00-04:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>Elixir Memory - Not Quite Free</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/05/09/elixir-memory-not-quite-free.html"/>
+    <id>https://stephenbussey.com/2018/05/09/elixir-memory-not-quite-free.html</id>
+    <published>2018-05-08T23:32:00-04:00</published>
+    <updated>2018-05-09T00:51:32-04:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I have been working on a shipping an Elixir service at SalesLoft to replace an existing
+piece of functionality in our system with a better version. One of the core changes
+is that the websocket communication of this system will be maintained by Elixir rather
+than by Pusher (our Rails goto). This post is going to explore some of the surprises
+and valuable lessons that I gained while debugging memory leaks in the service.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;I was doing a usual check-in on the service and noticed that the memory for only ~200
+websockets connected was peaking out at over 550MB. This seemed off and meant that
+connecting all users to the service would take many GB of memory. I was at a loss for
+what the problem could be though, but found some help in a useful diagnostic tool.&lt;/p&gt;
+
+&lt;h2&gt;Diagnosing Memory Culprit&lt;/h2&gt;
+
+&lt;p&gt;When doing local development, it&amp;rsquo;s very easy to pop open &lt;code&gt;:observer.start&lt;/code&gt; and get
+a wonderful interface to sift through processes and their memory consumption. However,
+exposing this in production is much more difficult (too difficult in my setup to bother).
+I found the tool &lt;a href="https://github.com/zhongwencool/observer_cli" target="_blank"&gt;observer_cli&lt;/a&gt; and have to
+say that it is one of the greatest tools in my toolbox right now. It is based on the
+well known &lt;code&gt;recon&lt;/code&gt; library, but provides a nice command line interface to visually
+see and sort through process listings. I have to give props to the library maintainer
+for implementing a feature I requested in a matter of days.&lt;/p&gt;
+
+&lt;p&gt;As I was looking at the observer_cli output, I noticed that Phoenix Channel Servers were
+appearing all over the top memory utilizers. Some would take up to 4MB, but averaged at about
+1 MB. For 1000 sockets, this would be between 1GB - 4GB of memory!&lt;/p&gt;
+
+&lt;h2&gt;Understanding Erlang Memory&lt;/h2&gt;
+
+&lt;p&gt;One of my favorite posts on Erlang is by Hamidreza Soleimani, &lt;a href="https://hamidreza-s.github.io/erlang%20garbage%20collection%20memory%20layout%20soft%20realtime/2015/08/24/erlang-garbage-collection-details-and-why-it-matters.html" target="_blank"&gt;Erlang Garbage Collection Details&lt;/a&gt;.
+This post goes over an important detail of how the 2-part Erlang GC works, young and old generational
+heaps. The gist of it is that the major GC operation can collect both young and old heaps,
+but is invoked infrequently as it is a &amp;ldquo;stop the process&amp;rdquo; type of GC. The minor GC
+operation can only collect young heap items, and will mark items as old if they survive
+a GC pass. What does this mean, though?&lt;/p&gt;
+
+&lt;p&gt;In the context of a request, it is possible for an operation to take multiple
+GC minor sweeps and still be referencing all of the allocated binaries (data). When
+this happens, those binaries are going to be marked as old heap and require that
+a full sweep happens to GC them. If the full sweep only happens in certain situations,
+it is possible for the situation to not occur and the full sweep doesn&amp;rsquo;t occur. In
+this case, we have a memory leak. This is exactly what was happening to my websocket.&lt;/p&gt;
+
+&lt;p&gt;It is possible to trigger a GC on the entire node to test out if there is a possible
+memory leak. Note that you don&amp;rsquo;t want to do this in a regular fashion and running
+the major GC may make your debugging sessions less valuable until time passes.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;# don&amp;#39;t do this often
+Process.list() |&amp;gt; Enum.each(&amp;amp;:erlang.garbage_collect/1)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Addressing this Memory Leak&lt;/h2&gt;
+
+&lt;p&gt;The websocket request that I&amp;rsquo;ve been discussing was new and a bit different than
+what I&amp;rsquo;ve done in the past. It is an interface to our &lt;a href="https://developers.salesloft.com/api.html" target="_blank"&gt;API&lt;/a&gt; and allows requests
+to be made on the open connection. Due to it being an API request, it would return
+up to 100 items at a time and require multiple pieces of data sourced from other
+services to operate. This equates to 2 things: memory (1-4 MB) and time (multiple minor sweeps).&lt;/p&gt;
+
+&lt;p&gt;&lt;a href="https://s3.us-east-2.amazonaws.com/ferd.erlang-in-anger/text.v1.1.0.pdf" target="_blank"&gt;Erlang in Anger 7.2.2&lt;/a&gt; mentions 5 different ways to fix a memory leak:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;call garbage collection manually at given intervals (icky, but somewhat efficient)&lt;/li&gt;
+&lt;li&gt;stop using binaries (often not desirable)&lt;/li&gt;
+&lt;li&gt;use binary:copy/1-2 if keeping only a small fragment (usually less than 64 bytes) of a larger binary&lt;/li&gt;
+&lt;li&gt;move work that involves larger binaries to temporary one-off processes that will die when they’re done (a lesser form of manual GC!)&lt;/li&gt;
+&lt;li&gt;or add hibernation calls when appropriate (possibly the cleanest solution for inactive processes)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;strong&gt;The above is copied from Erlang in Anger verbatim.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;For the work that this websocket request was doing, it made most sense to utilize
+a short lived process to execute and respond to the request.&lt;/p&gt;
+
+&lt;p&gt;The initial pass at the fix involved using &lt;code&gt;Task.async&lt;/code&gt; and awaiting the response.
+However, this proved to be even worse on memory because sending the response over
+the process barrier was causing the same leak. The solution here ended up being to
+utilize &lt;a href="https://hexdocs.pm/phoenix/Phoenix.Channel.html#socket_ref/1" target="_blank"&gt;&lt;code&gt;Phoenix.Channel socket_ref/1&lt;/code&gt;&lt;/a&gt;
+and responding to the socket request in the &lt;code&gt;Task.start&lt;/code&gt;d process using &lt;code&gt;Phoenix.Channel.reply(ref, reply)&lt;/code&gt;.
+The &lt;code&gt;socket_ref&lt;/code&gt; function is very useful and has some nice side effects. Due to
+serialization of processes, the original approach would block access to the socket
+during a request. With the new approach, the socket can handle multiple requests
+at the same time.&lt;/p&gt;
+
+&lt;h2&gt;Results from Fix&lt;/h2&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/erlang-memory/step-1.png" alt="memory drop from 550MB to 250MB" /&gt;
+  &lt;div&gt;
+    &lt;small&gt;
+      &lt;i&gt;Large fix from short lived process&lt;/i&gt;
+    &lt;/small&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The results from this code change were immediate and apparent. The Phoenix.Channel.Server
+processes that were from 1MB - 4MB were now at 30KB - 60KB. This lead to the massive drop
+in overall memory as seen above.&lt;/p&gt;
+
+&lt;h2&gt;Rinse and Repeat&lt;/h2&gt;
+
+&lt;p&gt;As more sockets were connected to the system, it became clear there was still a memory
+leak. By utilizing the &lt;code&gt;observer_cli&lt;/code&gt; tool, it was possible to see that the cowboy
+websocket processes were hovering at 1-2MB each. Upon discussion in the community Slack, it turns
+out that encoding the large payload suffers from the same type of memory leak that
+was mentioned previously. However, the fix is less optimal due to that code not
+being written by us.&lt;/p&gt;
+
+&lt;p&gt;It appeared that triggering a major GC was the best option.
+Phoenix even accommodates this with a special &lt;a href="https://hexdocs.pm/phoenix/Phoenix.Transports.WebSocket.html#module-garbage-collection" target="_blank"&gt;&lt;code&gt;:garbage_collect&lt;/code&gt;&lt;/a&gt;
+message handler, which is marked as a solution for use after processing large messages.
+We ended up triggering this 5s after the response of our large payload.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/erlang-memory/step-2.png" alt="memory drop from 350MB to 210MB" /&gt;
+  &lt;div&gt;
+    &lt;small&gt;
+      &lt;i&gt;Large fix from manual GC&lt;/i&gt;
+    &lt;/small&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;p&gt;This memory usage is from significantly more connected sockets than step 1, and we can
+clearly see how large of an impact the manual GC had. The memory is now predictable and
+stable for connected sockets.&lt;/p&gt;
+
+&lt;h2&gt;Final Thoughts&lt;/h2&gt;
+
+&lt;p&gt;This is a very constrained use case, although possibly common, for memory leaks of
+Phoenix websockets. However, the same principles apply to all of the processes we spawn
+in Elixir. When we have a process, and especially with a large number of processes, it
+is important to think about the life cycle of it and how it will play into garbage collection.
+As our processes become longer lived, this becomes even more important as our systems
+will be leaking memory over longer periods of time.&lt;/p&gt;
+
+&lt;p&gt;It seems easiest to just slap a full system GC into every process to keep memory usage
+low (and we can do that if desired), but there are other techniques related to process
+lifecycle and memory consumption that may be more effective in the end.&lt;/p&gt;
+
+&lt;p&gt;Again, I recommend reading &lt;a href="https://s3.us-east-2.amazonaws.com/ferd.erlang-in-anger/text.v1.1.0.pdf" target="_blank"&gt;Erlang in Anger 5, 7&lt;/a&gt;
+and &lt;a href="https://hamidreza-s.github.io/erlang%20garbage%20collection%20memory%20layout%20soft%20realtime/2015/08/24/erlang-garbage-collection-details-and-why-it-matters.html" target="_blank"&gt;Erlang Garbage Collection Details&lt;/a&gt;
+for more detailed information.&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>Introducing Elixir Response Snapshot Testing</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/04/17/introducing-elixir-response-snapshot-testing.html"/>
@@ -491,114 +645,6 @@ test really does help.&lt;/p&gt;
 &lt;hr&gt;
 
 &lt;p&gt;Thanks for reading the 15th post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
-really want to see!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 Days - Intro to Elixir Enumerable</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/15/intro-to-elixir-enumerable.html"/>
-    <id>https://stephenbussey.com/2018/02/15/intro-to-elixir-enumerable.html</id>
-    <published>2018-02-15T01:41:00-05:00</published>
-    <updated>2018-02-15T02:27:26-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;My co-worker Ben recently sent me a message for a blog post idea: looking at how
-Enumerable is utilized by Elixir Enum module. Specifically, he told me that
-all of Enum behavior can be implemented just by writing a single reduce
-function. If you&amp;rsquo;re like me, you might be thinking: &amp;ldquo;what, how is this?&amp;rdquo; Let&amp;rsquo;s
-dive in.&lt;/p&gt;
-
-&lt;p&gt;The goal of today&amp;rsquo;s post isn&amp;rsquo;t around how to use Enumerable to write your own, but
-rather about how Enum is implemented and how it can use such a simple Enumerable interface
-to achieve all of the Enum functionality.&lt;/p&gt;
-
-&lt;h2&gt;Enumerable Protocol&lt;/h2&gt;
-
-&lt;p&gt;The &lt;a href="https://hexdocs.pm/elixir/Enumerable.html" target="_blank"&gt;Elixir Enumerable docs&lt;/a&gt; seem like a
-good place to start this investigation. Sure enough, here we have it:&lt;/p&gt;
-
-&lt;blockquote&gt;
-&lt;p&gt;This protocol requires four functions to be implemented, reduce/3, count/1, member?/2, and slice/1. The core of the protocol is the reduce/3 function. All other functions exist as optimizations paths for data structures that can implement certain properties in better than linear time.&lt;/p&gt;
-&lt;/blockquote&gt;
-
-&lt;p&gt;Okay, so we know that only reduce/3 is required to be implemented. However, this
-function has a very particular type signature to make this all possible. A picture is
-worth a thousand words, so &lt;a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L3261" target="_blank"&gt;here&lt;/a&gt;
-is the reduce implementation for List:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;def reduce(_,       {:halt, acc}, _fun),   do: {:halted, acc}
-def reduce(list,    {:suspend, acc}, fun), do: {:suspended, acc, &amp;amp;reduce(list, &amp;amp;1, fun)}
-def reduce([],      {:cont, acc}, _fun),   do: {:done, acc}
-def reduce([h | t], {:cont, acc}, fun),    do: reduce(t, fun.(h, acc), fun)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;The final accumulation value is returned as &lt;code&gt;{:done, term}&lt;/code&gt;. Two alternate states should be
-handled: &lt;code&gt;halt&lt;/code&gt; and &lt;code&gt;suspend&lt;/code&gt;. &lt;code&gt;suspend&lt;/code&gt; in particular is a special case which is noted as
-not being needed by most regular enumerables.&lt;/p&gt;
-
-&lt;h2&gt;How is reduce/3 used?&lt;/h2&gt;
-
-&lt;p&gt;It took me a second to realize how this singular &lt;code&gt;reduce/3&lt;/code&gt; function signature can be
-used to implement all Enum functions. Let&amp;rsquo;s look at a few examples:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;def any?(enumerable, fun) do
-  Enumerable.reduce(enumerable, {:cont, false}, fn entry, _ -&amp;gt;
-    if fun.(entry), do: {:halt, true}, else: {:cont, false}
-  end)
-  |&amp;gt; elem(1)
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;In the any? implementation, the reducer is used in such a way that it halts immediately
-if the function is truthy, otherwise continuing the enumeration.&lt;/p&gt;
-
-&lt;p&gt;Let&amp;rsquo;s look at a function that utilizes the optional &lt;code&gt;count&lt;/code&gt; Enumerable function:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;def count(enumerable) do
-  case Enumerable.count(enumerable) do
-    {:ok, value} when is_integer(value) -&amp;gt;
-      value
-
-    {:error, module} -&amp;gt;
-      enumerable |&amp;gt; module.reduce({:cont, 0}, fn _, acc -&amp;gt; {:cont, acc + 1} end) |&amp;gt; elem(1)
-  end
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;In the above Enum.count implementation, the &lt;code&gt;Enumerable.count/1&lt;/code&gt; function is invoked for the
-enumerable. If it&amp;rsquo;s available and is an integer, then it&amp;rsquo;s returned. Otherwise, the reduce function
-is used for a linear time count implementation. It&amp;rsquo;s possible to see how the reduce function is
-used for a count, keeping an accumulator that starts at 0 and becomes acc + 1 on each enumeration.&lt;/p&gt;
-
-&lt;p&gt;Finally, certain Enum functions rely on a set of macros defined in &lt;a href="https://github.com/elixir-lang/elixir/blob/0727eaf37dbb7f2f5b9f4e7d0ab163e655dd8a3b/lib/elixir/lib/stream/reducers.ex#L134" target="_blank"&gt;&lt;code&gt;Stream.Reducers&lt;/code&gt;&lt;/a&gt;.
-These functions appear as &lt;code&gt;R.fn&lt;/code&gt; in the Enum code, as the required module is aliased as such.
-The Reducers module is implemented using some interesting meta programming. If we look at the
-&lt;a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L1302" target="_blank"&gt;&lt;code&gt;map/2&lt;/code&gt; macro definition&lt;/a&gt;,
-it utilizes a &lt;code&gt;next/3&lt;/code&gt; function which isn&amp;rsquo;t defined in this macro module. This is actually defined
-in the &lt;a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L241" target="_blank"&gt;Enum module&lt;/a&gt;,
-and works due to macros not evaluating code at generation time, but rather at execution time. I talked
-about this trait of macros in the &lt;a href="/2018/02/08/the-beauty-of-macros.html" target="_blank"&gt;Beauty of Macros&lt;/a&gt; post.&lt;/p&gt;
-
-&lt;h2&gt;Writing Enumerable Implementations&lt;/h2&gt;
-
-&lt;p&gt;I&amp;rsquo;m purposely keeping this post fairly light on how to implement the Enumerable protocol
-in practice, there are several good resources on how to do that. Understanding the underlying
-implementation is more of my focus here. However, there is benefit in looking at the Enumerable
-implementation for some core types like List and Map. The Enum module
-&lt;a href="https://github.com/elixir-lang/elixir/blob/e9dfa50c74488000d2c9de71e926cdd78609b3ac/lib/elixir/lib/enum.ex#L3273" target="_blank"&gt;defines these implementations&lt;/a&gt;
-and they can serve as a good starting point when writing your own.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;As you find yourself wondering how Elixir is internally built, keep in mind that the
-majority of Elixir is simply Elixir code. You most likely won&amp;rsquo;t need to read erlang or
-C code like you may need to in other languages. The best answers to your questions and
-curiosities are found in the code itself.&lt;/p&gt;
-
-&lt;p&gt;Thanks for reading the 14th post in my 28 days of Elixir. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
 really want to see!&lt;/p&gt;
