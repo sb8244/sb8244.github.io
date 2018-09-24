@@ -4,10 +4,127 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-05-08T23:32:00-04:00</updated>
+  <updated>2018-09-23T21:44:00-04:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>Elixir Probes - Replacing Elixometer</title>
+    <link rel="alternate" href="https://stephenbussey.com/2018/09/24/elixir-probes-replacing-elixometer.html"/>
+    <id>https://stephenbussey.com/2018/09/24/elixir-probes-replacing-elixometer.html</id>
+    <published>2018-09-23T21:44:00-04:00</published>
+    <updated>2018-09-23T22:30:48-04:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;It&amp;rsquo;s been a while since my last post. I&amp;rsquo;ve been chipping away at Elixir still, fortunately, focusing on making sure that other teams at SalesLoft are best equipped to build Elixir microservices. One of the most common items that need implemented on every Elixir project is a set of Datadog metrics. These metrics provide both VM health and application specific info.&lt;/p&gt;
+
+&lt;h1&gt;Elixometer&lt;/h1&gt;
+
+&lt;p&gt;Until now, all apps at SalesLoft have shipped with using Elixometer as an instrumentation service in our Elixir apps. Elixometer has a variety of methods that allow collection of stats and can report to a StatsD server. It also has a variety of problems:&lt;/p&gt;
+
+&lt;h4&gt;1. The mix.exs entry for Elixometer is quite involved.&lt;/h4&gt;
+
+&lt;p&gt;There seem to be some incompatiblies in the various libraries that have been released over time. Here is my current Elixometer mix.exs entry:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;# start exometer; force &amp;quot;correct&amp;quot; modules due to elixometer not compiling properly
+{:elixometer, &amp;quot;~&amp;gt; 1.2&amp;quot;},
+{:lager, &amp;quot;&amp;gt;= 3.2.1&amp;quot;, override: true},
+{:exometer, github: &amp;quot;Feuerlabs/exometer&amp;quot;},
+{:exometer_core, &amp;quot;~&amp;gt;1.4.0&amp;quot;, override: true},
+{:amqp_client, git: &amp;quot;https://github.com/dsrosario/amqp_client.git&amp;quot;, branch: &amp;quot;erlang_otp_19&amp;quot;, override: true},
+# end exometer
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;I haven&amp;rsquo;t even tried updating these because it took me several days to get a working config.&lt;/p&gt;
+
+&lt;h4&gt;2. Elixometer includes libraries that are outside of instrumentation.&lt;/h4&gt;
+
+&lt;p&gt;For instance, &lt;code&gt;lager&lt;/code&gt; is a listed dependency. This may not manifest as a problem in your project, but it could also be hiding from you. I discovered that including lager&amp;rsquo;s error logger module would clear out all of the other SASL error loggers, which is how Bugsnag was included. This meant that Bugsnag was being forcibly removed without my knowledge. The solution here was to disable lager&amp;rsquo;s error logger.&lt;/p&gt;
+
+&lt;h4&gt;3. Elixometer is fairly complex to setup and use.&lt;/h4&gt;
+
+&lt;p&gt;This has been a complaint both across the team and also on my own projects.&lt;/p&gt;
+
+&lt;p&gt;I once wanted to report a simple count to Datadog and plot a rate of change. After 1-2 days of trying to figuring out why it was not working, I discovered that all stats report as gauges unless a complex setup is used to specify the reporting type&amp;hellip;I ended up using a different StatsD library (Statix) at that point.&lt;/p&gt;
+
+&lt;h1&gt;Instruments - Elixometer&amp;rsquo;s Replacement&lt;/h1&gt;
+
+&lt;p&gt;Going forward, I will be using the &lt;a href="https://github.com/discordapp/instruments" target="_blank"&gt;Instruments&lt;/a&gt; library to report probed metrics to Datadog. I will be using &lt;a href="https://github.com/lexmag/statix" target="_blank"&gt;Statix&lt;/a&gt; to report non-probed application metrics to Datadog.&lt;/p&gt;
+
+&lt;p&gt;A probe is a bit of code that runs on a defined interval and reports the statistics on each run. An example of this is asking for VM memory utilization every 1s and sending that to StatsD. Instruments makes defining probes very easy, and I&amp;rsquo;m going to share my standard configuration.&lt;/p&gt;
+
+&lt;h2&gt;Instruments Setup&lt;/h2&gt;
+
+&lt;p&gt;I followed the guide on Github to setup Instruments in my application. Outside of the recommended config, I did find that reporting to the standard &lt;code&gt;Logger&lt;/code&gt; module during testing makes a ton of sense. To do that, I placed the following in &lt;code&gt;config/text.exs&lt;/code&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;config :instruments, reporter_module: Instruments.StatsReporter.Logger
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;My other config looks like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;config :statix,
+  prefix: &amp;quot;okr_app.#{Mix.env}&amp;quot;,
+  host: System.get_env(&amp;quot;STATSD_HOST&amp;quot;),
+  port: String.to_integer(System.get_env(&amp;quot;STATSD_PORT&amp;quot;) || &amp;quot;8125&amp;quot;),
+  disabled: System.get_env(&amp;quot;STATSD_HOST&amp;quot;) == nil
+
+config :instruments,
+  fast_counter_report_interval: 100,
+  probe_prefix: &amp;quot;probes&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Instruments Probe Definition&lt;/h2&gt;
+
+&lt;p&gt;Probes are defined in Instruments a bit differently than in Elixometer. Elixometer utilizes a static configuration, but I cannot find such an option for Instruments. I defined probes in my &lt;code&gt;application.ex&lt;/code&gt; file:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;def setup_probes() do
+  # I allow instruments to be disabled as this is an open source application and StatsD isn&amp;#39;t required
+  if Application.get_env(:instruments, :disabled) != true do
+    {:ok, _} = Application.ensure_all_started(:instruments)
+    interval = 1_000
+
+    Instruments.Probe.define(
+      &amp;quot;erlang.process_count&amp;quot;,
+      :gauge,
+      mfa: {:erlang, :system_info, [:process_count]},
+      report_interval: interval
+    )
+
+    Instruments.Probe.define(
+      &amp;quot;erlang.memory&amp;quot;,
+      :gauge,
+      mfa: {:erlang, :memory, []},
+      keys: [:total, :atom, :processes],
+      report_interval: interval
+    )
+
+    Instruments.Probe.define(
+      &amp;quot;erlang.statistics.run_queue&amp;quot;,
+      :gauge,
+      mfa: {:erlang, :statistics, [:run_queue]},
+      report_interval: interval
+    )
+
+    Instruments.Probe.define(
+      &amp;quot;erlang.system_info.process_count&amp;quot;,
+      :gauge,
+      mfa: {:erlang, :system_info, [:process_count]},
+      report_interval: interval
+    )
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Instruments&amp;rsquo; documentation discusses how custom probes can be designed for your application specifically. In addition to these probes, you can utilize Statix library to send StatsD metrics. That is outside of the scope of this post, but it is useful to note that Instruments defines &lt;a href="https://github.com/discordapp/instruments/blob/master/lib/instruments.ex#L78" target="_blank"&gt;various functions&lt;/a&gt; for sending data to the underlying Statix module. You can also use &lt;code&gt;Instruments.Statix&lt;/code&gt; directly, if that suits your needs better.&lt;/p&gt;
+
+&lt;h1&gt;Final Thoughts&lt;/h1&gt;
+
+&lt;p&gt;I haven&amp;rsquo;t seen any downside with Instruments yet that would make me use Elixometer again. It seems much easier to setup, is more obvious to read, and doesn&amp;rsquo;t involve interfacing with an erlang module in a sometimes confusing fashion. Due to all of this, it seems like a great package for setting up StatsD probes.&lt;/p&gt;
+
+&lt;p&gt;I hinted at an open source implementation that uses Instruments. I&amp;rsquo;m working on putting the final touches on the repo and open-sourcing it under the SalesLoft Github org. There will be a blog post when that happens, as I&amp;rsquo;ve been trying to utilize best practices (of the current moment) when building it.&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>Elixir Memory - Not Quite Free</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/05/09/elixir-memory-not-quite-free.html"/>
@@ -511,140 +628,6 @@ distributed data from the beginning is worth it.&lt;/p&gt;
 &lt;hr&gt;
 
 &lt;p&gt;Thanks for reading the 16th post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
-really want to see!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 Days - My favorite Elixir testing tool - Mockery</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/15/my-favorite-elixir-testing-tool-mockery.html"/>
-    <id>https://stephenbussey.com/2018/02/15/my-favorite-elixir-testing-tool-mockery.html</id>
-    <published>2018-02-15T18:23:00-05:00</published>
-    <updated>2018-02-15T20:33:13-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I hate to admit it, but I&amp;rsquo;ve finally started truly unit testing with Elixir. I come
-from the Ruby world where our large test suite often runs slowly due to things like
-data insertion / access in the tests, large object graphs, etc. It&amp;rsquo;s easy to criticize
-situations like this after the fact, but I find the reasons along the way were paved
-with the best intentions. As I learn and adopt Elixir at SalesLoft, I&amp;rsquo;ve been extra
-careful to avoid these situations from playing out again.&lt;/p&gt;
-
-&lt;p&gt;The biggest tool in my arsenal so far has been &lt;a href="https://github.com/appunite/mockery" target="_blank"&gt;Mockery&lt;/a&gt;, a mocking tool that
-allows the test suite to be run in parallel. This seems like a natural thing to expect
-from a mocking tool, but some others that I used do not have this property. I think
-that the design of Mockery also leads to cleaner code, so I&amp;rsquo;ve adopted it.&lt;/p&gt;
-
-&lt;h2&gt;Mockery Usage&lt;/h2&gt;
-
-&lt;p&gt;The Github for Mockery lays out all different usage possibilities for it, I&amp;rsquo;ll just
-cover the one or two that I use most often.&lt;/p&gt;
-
-&lt;p&gt;The first, and most common case, is mocking out expensive operations. An example of this is network requests;
-I&amp;rsquo;m able to use tools to test these requests (topic for another post?), in their specific modules,
-but then keep these requests out of other places. Another example is for database access. I
-can write query objects or repositories to handle the fetching / insertion of data, but
-then mock out these modules in their usage throughout a system. Here&amp;rsquo;s an example usage:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;defmodule MyRequest do
-  @widgets_query Mockery.of(&amp;quot;WidgetsQuery&amp;quot;)
-
-  def call(authentication_context) do
-    @widgets_query.call(authentication_context)
-  end
-end
-
-defmodule MyRequestTest do
-  use ExUnit.Case, async: true
-  use Mockery
-
-  test &amp;quot;call returns the widgets query&amp;quot; do
-    auth = %{}
-    mock WidgetsQuery, :call, [%Widget{id: 1}, %Widget{id: 2}]
-    assert MyRequest.call(auth) == [%Widget{id: 1}, %Widget{id: 2}]
-    assert_called WidgetsQuery, :call, [^auth]
-  end
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;This is about the most basic usage to Mockery possible. The module is mocked
-for this process only, then used by the request. After the call, we can check that
-it was called properly. This allows the important parts of a mock to be fully covered
-in our test suite: params and results.&lt;/p&gt;
-
-&lt;p&gt;There is another usage of Mockery that I&amp;rsquo;ve found useful, it&amp;rsquo;s to implement a mock that
-always exists unless specified by a test. In the above mock example, if we wrote another
-test, that module would not be mocked anymore, leading to a real database call. This
-may not be desired if we end up mocking a module in a lot of places. Enter &lt;code&gt;by:&lt;/code&gt; keyword:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;@widgets_query Mockery.of(&amp;quot;WidgetsQuery&amp;quot;, by: &amp;quot;WidgetsQuery.Mock&amp;quot;)
-
-defmodule WidgetsQuery do
-  defmodule Mock do
-    def call(_auth), do: []
-  end
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;In the above usage of Mockery, any call in a normal test will return an empty list.
-This may not be desirable for certain cases, so your mileage will vary with such a
-technique.&lt;/p&gt;
-
-&lt;h2&gt;Mockery for Processes&lt;/h2&gt;
-
-&lt;p&gt;Another really powerful use case of mocking, that I&amp;rsquo;ve found and think warrants a
-separate mention, is for process based communication. In practice, testing processes
-can get a bit hairy. Timing, process ownership, race conditions are all easily possible
-in tests due to tests running in a process and our code being able to run in processes.
-Mockery can help out here by mocking out the explicit boundaries between processes.&lt;/p&gt;
-
-&lt;p&gt;While I find a ton of power in Mockery for this use case, I urge even more caution than
-others. It would be possible to devise an incorrect process tree that works in tests
-solely because of mocking. Don&amp;rsquo;t shy away from mocking, but don&amp;rsquo;t take to it immediately
-either.&lt;/p&gt;
-
-&lt;h2&gt;Dangers of mocking&lt;/h2&gt;
-
-&lt;p&gt;Mocking is not a silver bullet for tests. It can certainly help greatly with common
-expensive operations and allows for testing of boundaries rather than going past
-the boundaries in each test. However, what if our boundaries are not correct?&lt;/p&gt;
-
-&lt;p&gt;A few common issues arise with mocking. It is possible to setup a mock on a function
-that doesn&amp;rsquo;t exist, on params that are not reflective of reality, and on results that
-are not part of the type signature of the function. Each of these scenarios has the
-potential for a worst case testing scenario: code that passes locally but fails in
-QA or production testing.&lt;/p&gt;
-
-&lt;p&gt;Mockery does help with the function not existing, as it requires mocking out functions
-that do exist in the target module. This can even work on arity (ensure that the right
-arity is mocked out). It cannot, unfortunately, help with the input or output not being
-real. Engineers must be on the lookout for these issues and &lt;em&gt;diligently&lt;/em&gt; use mocking,
-ensuring that the usage is correct at write-time and also after any refactors.&lt;/p&gt;
-
-&lt;p&gt;I haven&amp;rsquo;t done so, but my guess is that typespecs might be able to help out here. I don&amp;rsquo;t
-see any obvious integrations with Mockery, but anything is possible and could be implemented
-custom based on the typespec metadata.&lt;/p&gt;
-
-&lt;h2&gt;Why Mockery over others?&lt;/h2&gt;
-
-&lt;p&gt;I had some problems with other mocking tools that dynamically switch out modules
-globally. These types of tools require that test processes run synchronously rather
-than asynchronously. This is not a big deal for small test suites, but could be a huge
-limiter for a large test suite. At the scale of our product, I have to assume that a
-service could become large over time, and so I&amp;rsquo;m very careful about test speed.&lt;/p&gt;
-
-&lt;p&gt;I also find that defining what is mockable in the module (rather than anything being
-mockable via the test suite) allows my code to be more readable and explicit. All of
-a sudden, I can tell exactly what is mockable rather than assuming that anything is
-mockable. If I saw someone mocking an &lt;code&gt;Enum&lt;/code&gt; function, for example, I would have
-an immediate red flag raised. Seeing this play out in the module rather than the
-test really does help.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;Thanks for reading the 15th post in my 28 days of Elixir. Keep up through the month of February to see if I can
 stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
 am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
 really want to see!&lt;/p&gt;
