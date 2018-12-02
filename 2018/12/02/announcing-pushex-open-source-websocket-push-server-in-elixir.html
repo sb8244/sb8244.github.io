@@ -28,41 +28,69 @@
       </header>
 
       <h1>Announcing PushEx: Open-Source WebSocket Push Server in Elixir</h1>
-      <p>I&rsquo;m happy to announce the open-sourcing of a project that I&rsquo;ve been putting a good deal of effort into, <a href="https://github.com/pushex-project/pushex" target="_blank">PushEx</a>. PushEx is a WebSocket push server built in Elixir; it allows you to send payloads from your servers to your users in real-time. In this post, I will go into depth about the problem PushEx solves, why I&rsquo;m excited about it, and why Elixir is perfect for the problem space.</p>
+      <p>I&rsquo;m happy to announce the open-sourcing of a project that I&rsquo;ve been putting a good deal of time and effort into, <a href="https://github.com/pushex-project/pushex" target="_blank">PushEx</a>. PushEx is a WebSocket push server built in Elixir; it allows you to send payloads from your servers to your users in real-time. In this post, I will go in-depth about the problem PushEx solves, why I&rsquo;m excited about it, and why Elixir is perfect for the problem space.</p>
 
 <h1>The Problem</h1>
 
-<p>As consumers of an online web application use the application, asynchronous processes may take place that the user needs to be alerted to. Some examples of this include: notifying a user when they get a new message, alerting the user when their multi-minute import finishes, updating the frontend website as backend data models are updated. WebSockets allow an elegant solution to this problem because they enable the backend servers to maintain a connection to the frontend that the user is connected to.</p>
+<p>As consumers of an online web application use the application, asynchronous processes may take place that the user needs alerted to. Some examples of this include:</p>
 
-<p>WebSockets themselves bring about problems as well. The web server must be capable of handling all of the connections and keeping them alive every so often. Multiple servers must also be able to have knowledge about each other, because the user may be connected to server A but the request for a push goes through server B. Phoenix and Elixir provide excellent solutions to these problems, which is what PushEx is built on.</p>
+<ul>
+<li>Notifying a user when they get a new message</li>
+<li>Alerting the user when their multi-minute import finishes</li>
+<li>Updating the frontend website as backend data models are updated</li>
+</ul>
+
+<p>WebSockets allow an elegant solution to this problem because they enable the backend servers to maintain a direct connection to the user. The servers can then send data to the connected users nearly instantly.</p>
+
+<p>However, WebSockets bring about their own problems. The web server must be capable of handling all of the connections and keeping them alive every so often. In a production deployment, multiple servers must also be able to have knowledge about each other, because the user may be connected to server A but the request for a push goes through server B. Phoenix and Elixir, the foundation that PushEx leverages, provide excellent solutions to these problems.</p>
 
 <h1>Elixir, A Great Solution</h1>
 
-<p>Elixir is an excellent language for solving the problem of WebSockets. Some properties of Elixir that are great for this problem are: parallel processing power for efficient handling of many connections, built-in networking between multiple servers in a deployment, incremental garbage collection per process (many connections won&rsquo;t freeze at the same time), ability to hold very large sets of processes (supports many connections).</p>
+<p>Elixir is an excellent language for solving the problem of WebSockets. Some properties of Elixir that are great for this problem are:</p>
 
-<p>Phoenix leverages the power of Elixir to provide an excellent WebSocket solution, and PushEx provides these same benefits because it is built using Phoenix Channels. In fact, Phoenix has been benchmarked at being able to support over 2 million connections on a single large box. While this is a fun benchmark, real world examples will often have many servers networked together for efficiency. Phoenix provides a great solution to the problems that come with this through &ldquo;Presence&rdquo;, a mathematically efficient solution to knowing the state of the distributed WebSockets.</p>
+<ul>
+<li>Parallel processing power for efficient handling of many connections</li>
+<li>Built-in networking between multiple servers in a deployment</li>
+<li>Ability to hold very large sets of processes (supports many connections)</li>
+<li>Incremental garbage collection per process (many connections won&rsquo;t freeze at the same time)</li>
+<li>Error separation between processes (connections won&rsquo;t crash each other)</li>
+</ul>
+
+<p>Phoenix leverages the power of Elixir to provide an excellent WebSocket solution, and PushEx provides these same benefits because it is built using Phoenix Channels. In fact, Phoenix has been benchmarked at being able to support over 2 million connections on a single large box. While this is a fun benchmark, real world implementations will often have many servers networked together for efficiency, scalability, and redundancy. Phoenix provides a solution to the problems that come with distributed servers through &ldquo;Presence&rdquo;, a mathematically efficient solution to knowing the state of the distributed WebSockets.</p>
 
 <h1>Challenging to Bring to Production</h1>
 
-<p>Despite the effectiveness of Elixir and Phoenix for WebSockets, developing a production-ready push server is still not that easy of a task. Throughout the development of PushEx, an <a href="https://github.com/phoenixframework/phoenix/pull/3141" target="_blank">improvement</a> was found/developed to improve Phoenix&rsquo;s JS client and the properties of many simultaneous connections were <a href="https://elixirforum.com/t/phoenix-presence-mailbox-full/15139/13" target="_blank">examined</a> that help make PushEx production-ready and scalable to a large number of connections.</p>
+<p>Despite the effectiveness of Elixir and Phoenix for WebSockets, developing a production-ready push server is not a trivial task. Throughout the development of PushEx, an <a href="https://github.com/phoenixframework/phoenix/pull/3141" target="_blank">improvement</a> was found/developed to improve Phoenix&rsquo;s JS client availability and the properties of many simultaneous connections were <a href="https://elixirforum.com/t/phoenix-presence-mailbox-full/15139/13" target="_blank">examined</a>. This work helps make PushEx production-ready and scalable to a large number of clients.</p>
 
 <p>While there are large companies using WebSockets in production successfully, it is easy to see that small details can be missed. The goal with PushEx is to identify, solve, document, and educate on these small details.</p>
 
-<p>PushEx seeks to make developing your production-ready push server easy! The <a href="https://hexdocs.pm/push_ex/standalone.html#content" target="_blank">Getting Started</a> guide allows you to get up and running in less than 10 steps, with only a little bit of code needing developed.</p>
+<p>PushEx seeks to make developing your production-ready push server easy! The <a href="https://hexdocs.pm/push_ex/standalone.html#content" target="_blank">Getting Started - Standalone Installation guide</a> allows you to get up and running in less than 10 steps, with only a bit of application-specific code needing developed.</p>
+
+<h1>Using PushEx</h1>
+
+<p>PushEx has been designed to be easy to setup and will be comfortable for Elixir developers. There are, however, quite a few guides written that will help make the process of developing and deploying PushEx easier. You can find these guides on <a href="https://hexdocs.pm/push_ex/readme.html" target="_blank">hexdocs.pm</a>.</p>
+
+<p>PushEx is currently in a 1.0.0 release candidate. An implementation has been developed for use in production at SalesLoft, and will be tested there within 30 days. Once it is in production, the 1.0.0 release will be shipped. I do not anticipate much changing between now and then, as the core system is similar to what is already in use on another internal project.</p>
 
 <h1>Giving Back to Elixir Community</h1>
 
-<p>Elixir and Phoenix are really providing the backbone of PushEx and are what make it great. To that end, I want to invite the community to ask any questions they have on the PushEx project so that they may have some of their challenges solved. Please feel free to ask <strong>any</strong> question on the <a href="https://github.com/pushex-project/pushex/issues" target="_blank">PushEx Issue Tracker</a> about any code or ideas in the project. I will personally read and answer each one to help provide back to the community.</p>
+<p>Elixir and Phoenix are providing the solid backbone of PushEx and help to make it great. To that end, I want to invite the community to ask any questions they have on the PushEx project so that they may have some of their challenges solved. Please feel free to ask <strong>any</strong> question on the <a href="https://github.com/pushex-project/pushex/issues" target="_blank">PushEx Issue Tracker</a> regarding any code or ideas in the project. I will personally read and answer each one to help provide back to the community.</p>
 
 <hr>
 
-<p>Explore PushEx at https://github.com/pushex-project/pushex.</p>
+<p>Explore PushEx on:</p>
+
+<ul>
+<li><a href="https://github.com/pushex-project" target="_blank">Github</a></li>
+<li><a href="https://hex.pm/packages/push_ex" target="_blank">Hex</a></li>
+</ul>
 
 
       <div class="tags-listing">
         <span>View other posts tagged:</span>
           <a href="/tags/elixir.html">elixir</a>
           <a href="/tags/engineering.html">engineering</a>
+          <a href="/tags/pushex.html">pushex</a>
       </div>
     </article>
   </div>
