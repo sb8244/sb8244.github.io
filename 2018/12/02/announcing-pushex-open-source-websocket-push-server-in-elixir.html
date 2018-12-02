@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Announcing PushEx: Open-Source WebSocket Push Server in Elixir</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>Announcing PushEx: Open-Source WebSocket Push Server in Elixir</h1>
+      <p>I&rsquo;m happy to announce the open-sourcing of a project that I&rsquo;ve been putting a good deal of effort into, <a href="https://github.com/pushex-project/pushex" target="_blank">PushEx</a>. PushEx is a WebSocket push server built in Elixir; it allows you to send payloads from your servers to your users in real-time. In this post, I will go into depth about the problem PushEx solves, why I&rsquo;m excited about it, and why Elixir is perfect for the problem space.</p>
+
+<h1>The Problem</h1>
+
+<p>As consumers of an online web application use the application, asynchronous processes may take place that the user needs to be alerted to. Some examples of this include: notifying a user when they get a new message, alerting the user when their multi-minute import finishes, updating the frontend website as backend data models are updated. WebSockets allow an elegant solution to this problem because they enable the backend servers to maintain a connection to the frontend that the user is connected to.</p>
+
+<p>WebSockets themselves bring about problems as well. The web server must be capable of handling all of the connections and keeping them alive every so often. Multiple servers must also be able to have knowledge about each other, because the user may be connected to server A but the request for a push goes through server B. Phoenix and Elixir provide excellent solutions to these problems, which is what PushEx is built on.</p>
+
+<h1>Elixir, A Great Solution</h1>
+
+<p>Elixir is an excellent language for solving the problem of WebSockets. Some properties of Elixir that are great for this problem are: parallel processing power for efficient handling of many connections, built-in networking between multiple servers in a deployment, incremental garbage collection per process (many connections won&rsquo;t freeze at the same time), ability to hold very large sets of processes (supports many connections).</p>
+
+<p>Phoenix leverages the power of Elixir to provide an excellent WebSocket solution, and PushEx provides these same benefits because it is built using Phoenix Channels. In fact, Phoenix has been benchmarked at being able to support over 2 million connections on a single large box. While this is a fun benchmark, real world examples will often have many servers networked together for efficiency. Phoenix provides a great solution to the problems that come with this through &ldquo;Presence&rdquo;, a mathematically efficient solution to knowing the state of the distributed WebSockets.</p>
+
+<h1>Challenging to Bring to Production</h1>
+
+<p>Despite the effectiveness of Elixir and Phoenix for WebSockets, developing a production-ready push server is still not that easy of a task. Throughout the development of PushEx, an <a href="https://github.com/phoenixframework/phoenix/pull/3141" target="_blank">improvement</a> was found/developed to improve Phoenix&rsquo;s JS client and the properties of many simultaneous connections were <a href="https://elixirforum.com/t/phoenix-presence-mailbox-full/15139/13" target="_blank">examined</a> that help make PushEx production-ready and scalable to a large number of connections.</p>
+
+<p>While there are large companies using WebSockets in production successfully, it is easy to see that small details can be missed. The goal with PushEx is to identify, solve, document, and educate on these small details.</p>
+
+<p>PushEx seeks to make developing your production-ready push server easy! The <a href="https://hexdocs.pm/push_ex/standalone.html#content" target="_blank">Getting Started</a> guide allows you to get up and running in less than 10 steps, with only a little bit of code needing developed.</p>
+
+<h1>Giving Back to Elixir Community</h1>
+
+<p>Elixir and Phoenix are really providing the backbone of PushEx and are what make it great. To that end, I want to invite the community to ask any questions they have on the PushEx project so that they may have some of their challenges solved. Please feel free to ask <strong>any</strong> question on the <a href="https://github.com/pushex-project/pushex/issues" target="_blank">PushEx Issue Tracker</a> about any code or ideas in the project. I will personally read and answer each one to help provide back to the community.</p>
+
+<hr>
+
+<p>Explore PushEx at https://github.com/pushex-project/pushex.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
