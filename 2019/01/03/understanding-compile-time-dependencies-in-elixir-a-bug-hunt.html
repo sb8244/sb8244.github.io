@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Understanding Compile Time Dependencies in Elixir - A Bug Hunt</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-bc425e84.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+      </header>
+
+      <h1>Understanding Compile Time Dependencies in Elixir - A Bug Hunt</h1>
+      <p>This blog post will cover a fairly trivial but still interesting problem that I encountered at work today. I think it&rsquo;s worth writing about simply because it&rsquo;s a bit non-obvious and will probably happen to other people as well. It also is a good time to reinforce our understanding of how the Elixir compiler works and why the order of things matters.</p>
+
+<hr>
+
+<p>The issue started after upgrading one of our repositories to the latest Elixir version (from 1.6) and upgrading Distillery from 1.5 -&gt; 2.0. The problem manifested itself as our instrumentation disappearing in DataDog. The graphs was there before the deployment, then immediately became empty after.</p>
+
+<p>The immediate thought is that something could have been wrong with 1.7 or the upgrade libraries (and not something we did). However, this seems unlikely given that Elixir 1.7 has been out in the wild for a while now and has had time to get any kinks worked out (and something this major would be unlikely anyways). We power our instrumentation with <a href="https://github.com/discordapp/instruments/" target="_blank">Instruments</a> as seen in a <a href="/2018/09/24/elixir-probes-replacing-elixometer.html" target="_blank">past post</a> and so we verified that the application was started and configured with all of our probes&hellip;everything was visibly okay on this front.</p>
+
+<p>After confirming that instruments should be working, we noticed that DataDog was reporting some stats for our application that looked an awful lot like what we wanted&hellip;it was just missing our &ldquo;.probes&rdquo; namespace. The problem isn&rsquo;t that the stats weren&rsquo;t reporting, but that they were reporting without our <code>probe_prefix</code>.</p>
+
+<h2>The Code Problem</h2>
+
+<p>Inside of Instruments, there is a line of code which loads the provided probe prefix and places it into a module attribute:</p>
+
+<pre><code># https://github.com/discordapp/instruments/blob/89a620d181ba4a04ed0ac01c47057c018d645428/lib/probe/definitions.ex#L11
+@probe_prefix Application.get_env(:instruments, :probe_prefix)
+</code></pre>
+
+<p>This line of code happens inside of a <code>defmodule</code>, which means that it is read from at compile time and not at run-time. It would be possible to use <code>Application.get_env/2</code> at run-time using something like <code>def probe_prefix</code>, but there is nothing wrong with the module attribute approach.</p>
+
+<p>In Distillery 1, all config was provided at compile time and <code>probe_prefix</code> would always be present. In Distillery 2 (with the awesome new config providers), config can optionally be provided at run time; this simplifies and fixes quite a few deployment quirks. Our standard for Distillery 2 config providers has been to move <code>config/prod.exs</code> to <code>rel/config/runtime.exs</code>.</p>
+
+<h2>The Fix</h2>
+
+<p>In hindsight, we should not have moved the entire contents of <code>config/prod.exs</code> into our config provider. As Paul mentions in his <a href="https://dockyard.com/blog/2018/08/23/announcing-distillery-2-0" target="_blank">release blog post</a>, &ldquo;You can still use all of the config files under config/ in your project, but you should use those for compile-time config and default values only&rdquo;.</p>
+
+<p>The fix is as simple as making sure our <code>runtime.exs</code> file only has dynamic values in it. This means that we provide a <code>config/prod.exs</code> file for static configuration, and a <code>rel/config/runtime.exs</code> file for dynamic configuration.</p>
+
+<h2>Compilation vs Run-time</h2>
+
+<p>The reason that I liked this small bug is that it reinforces understanding of compilation and how we can very quickly end up blurring the line between run-time and compile-time. As users and authors of code, we have to be cognizant of where are values are coming from and where provided values are going. It often will be perfectly &ldquo;okay&rdquo; to do things incorrectly (because there are many situations where it wouldn&rsquo;t be a problem), but it can be difficult to track down when it is not okay. In particular, this issue looked like <code>probe_prefix</code> was setup correctly, and only become clear through reading of the source code that it was not setup correctly.</p>
+
+<hr>
+
+<p>Thanks for reading! I&rsquo;ll be speaking at <a href="https://lonestarelixir.com/2019/" target="_blank">Lonestar ElixirConf</a> about bringing Elixir to production, looking at both human and tech challenges in doing so.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>

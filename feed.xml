@@ -4,16 +4,62 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2018-12-02T15:00:00-05:00</updated>
+  <updated>2019-01-02T21:59:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>Understanding Compile Time Dependencies in Elixir - A Bug Hunt</title>
+    <link rel="alternate" href="https://stephenbussey.com/2019/01/03/understanding-compile-time-dependencies-in-elixir-a-bug-hunt.html"/>
+    <id>https://stephenbussey.com/2019/01/03/understanding-compile-time-dependencies-in-elixir-a-bug-hunt.html</id>
+    <published>2019-01-02T21:59:00-05:00</published>
+    <updated>2019-01-02T22:12:42-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;This blog post will cover a fairly trivial but still interesting problem that I encountered at work today. I think it&amp;rsquo;s worth writing about simply because it&amp;rsquo;s a bit non-obvious and will probably happen to other people as well. It also is a good time to reinforce our understanding of how the Elixir compiler works and why the order of things matters.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;The issue started after upgrading one of our repositories to the latest Elixir version (from 1.6) and upgrading Distillery from 1.5 -&amp;gt; 2.0. The problem manifested itself as our instrumentation disappearing in DataDog. The graphs was there before the deployment, then immediately became empty after.&lt;/p&gt;
+
+&lt;p&gt;The immediate thought is that something could have been wrong with 1.7 or the upgrade libraries (and not something we did). However, this seems unlikely given that Elixir 1.7 has been out in the wild for a while now and has had time to get any kinks worked out (and something this major would be unlikely anyways). We power our instrumentation with &lt;a href="https://github.com/discordapp/instruments/" target="_blank"&gt;Instruments&lt;/a&gt; as seen in a &lt;a href="/2018/09/24/elixir-probes-replacing-elixometer.html" target="_blank"&gt;past post&lt;/a&gt; and so we verified that the application was started and configured with all of our probes&amp;hellip;everything was visibly okay on this front.&lt;/p&gt;
+
+&lt;p&gt;After confirming that instruments should be working, we noticed that DataDog was reporting some stats for our application that looked an awful lot like what we wanted&amp;hellip;it was just missing our &amp;ldquo;.probes&amp;rdquo; namespace. The problem isn&amp;rsquo;t that the stats weren&amp;rsquo;t reporting, but that they were reporting without our &lt;code&gt;probe_prefix&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2&gt;The Code Problem&lt;/h2&gt;
+
+&lt;p&gt;Inside of Instruments, there is a line of code which loads the provided probe prefix and places it into a module attribute:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;# https://github.com/discordapp/instruments/blob/89a620d181ba4a04ed0ac01c47057c018d645428/lib/probe/definitions.ex#L11
+@probe_prefix Application.get_env(:instruments, :probe_prefix)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This line of code happens inside of a &lt;code&gt;defmodule&lt;/code&gt;, which means that it is read from at compile time and not at run-time. It would be possible to use &lt;code&gt;Application.get_env/2&lt;/code&gt; at run-time using something like &lt;code&gt;def probe_prefix&lt;/code&gt;, but there is nothing wrong with the module attribute approach.&lt;/p&gt;
+
+&lt;p&gt;In Distillery 1, all config was provided at compile time and &lt;code&gt;probe_prefix&lt;/code&gt; would always be present. In Distillery 2 (with the awesome new config providers), config can optionally be provided at run time; this simplifies and fixes quite a few deployment quirks. Our standard for Distillery 2 config providers has been to move &lt;code&gt;config/prod.exs&lt;/code&gt; to &lt;code&gt;rel/config/runtime.exs&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2&gt;The Fix&lt;/h2&gt;
+
+&lt;p&gt;In hindsight, we should not have moved the entire contents of &lt;code&gt;config/prod.exs&lt;/code&gt; into our config provider. As Paul mentions in his &lt;a href="https://dockyard.com/blog/2018/08/23/announcing-distillery-2-0" target="_blank"&gt;release blog post&lt;/a&gt;, &amp;ldquo;You can still use all of the config files under config/ in your project, but you should use those for compile-time config and default values only&amp;rdquo;.&lt;/p&gt;
+
+&lt;p&gt;The fix is as simple as making sure our &lt;code&gt;runtime.exs&lt;/code&gt; file only has dynamic values in it. This means that we provide a &lt;code&gt;config/prod.exs&lt;/code&gt; file for static configuration, and a &lt;code&gt;rel/config/runtime.exs&lt;/code&gt; file for dynamic configuration.&lt;/p&gt;
+
+&lt;h2&gt;Compilation vs Run-time&lt;/h2&gt;
+
+&lt;p&gt;The reason that I liked this small bug is that it reinforces understanding of compilation and how we can very quickly end up blurring the line between run-time and compile-time. As users and authors of code, we have to be cognizant of where are values are coming from and where provided values are going. It often will be perfectly &amp;ldquo;okay&amp;rdquo; to do things incorrectly (because there are many situations where it wouldn&amp;rsquo;t be a problem), but it can be difficult to track down when it is not okay. In particular, this issue looked like &lt;code&gt;probe_prefix&lt;/code&gt; was setup correctly, and only become clear through reading of the source code that it was not setup correctly.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;Thanks for reading! I&amp;rsquo;ll be speaking at &lt;a href="https://lonestarelixir.com/2019/" target="_blank"&gt;Lonestar ElixirConf&lt;/a&gt; about bringing Elixir to production, looking at both human and tech challenges in doing so.&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>Announcing PushEx: Open-Source WebSocket Push Server in Elixir</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/12/02/announcing-pushex-open-source-websocket-push-server-in-elixir.html"/>
     <id>https://stephenbussey.com/2018/12/02/announcing-pushex-open-source-websocket-push-server-in-elixir.html</id>
     <published>2018-12-02T15:00:00-05:00</published>
-    <updated>2018-12-02T17:44:02-05:00</updated>
+    <updated>2019-01-02T21:43:58-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -80,7 +126,7 @@
     <link rel="alternate" href="https://stephenbussey.com/2018/09/24/elixir-probes-replacing-elixometer.html"/>
     <id>https://stephenbussey.com/2018/09/24/elixir-probes-replacing-elixometer.html</id>
     <published>2018-09-23T21:44:00-04:00</published>
-    <updated>2018-12-02T16:16:25-05:00</updated>
+    <updated>2019-01-02T21:43:58-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -197,7 +243,7 @@ end
     <link rel="alternate" href="https://stephenbussey.com/2018/05/09/elixir-memory-not-quite-free.html"/>
     <id>https://stephenbussey.com/2018/05/09/elixir-memory-not-quite-free.html</id>
     <published>2018-05-08T23:32:00-04:00</published>
-    <updated>2018-12-02T16:16:25-05:00</updated>
+    <updated>2019-01-02T21:43:58-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -351,7 +397,7 @@ for more detailed information.&lt;/p&gt;
     <link rel="alternate" href="https://stephenbussey.com/2018/04/17/introducing-elixir-response-snapshot-testing.html"/>
     <id>https://stephenbussey.com/2018/04/17/introducing-elixir-response-snapshot-testing.html</id>
     <published>2018-04-16T21:53:00-04:00</published>
-    <updated>2018-12-02T16:16:25-05:00</updated>
+    <updated>2019-01-02T21:43:58-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -441,7 +487,7 @@ on Github issues if you see anything you&amp;rsquo;d like fixed or have any ques
     <link rel="alternate" href="https://stephenbussey.com/2018/02/25/writing-break.html"/>
     <id>https://stephenbussey.com/2018/02/25/writing-break.html</id>
     <published>2018-02-25T12:42:00-05:00</published>
-    <updated>2018-12-02T16:16:25-05:00</updated>
+    <updated>2019-01-02T21:43:58-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -453,130 +499,6 @@ prevent enjoyment of where I am. As such, I ended my 28 days after 18.&lt;/p&gt;
 &lt;p&gt;I have a lot of good content still in mind. Most of the content that I want to work
 on is now longer form, requiring much more research or examples to be effective. I hope
 to establish a new cadence in the upcoming weeks to get these posts out.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>28 Days - Exploring Elixir Map access</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/18/exploring-elixir-map-access.html"/>
-    <id>https://stephenbussey.com/2018/02/18/exploring-elixir-map-access.html</id>
-    <published>2018-02-18T15:42:00-05:00</published>
-    <updated>2018-12-02T16:16:25-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I missed a day&amp;hellip;damn. I did have a great day with my dad before he left to go home,
-so I&amp;rsquo;m letting it slide. I have a last minute trip coming up as well, so I&amp;rsquo;ll be working
-extra hard over the next few days to come up with some ideas and execute on them while
-flying over the pond to Spain.&lt;/p&gt;
-
-&lt;p&gt;Today, I want to dive deep into a common part of Elixir: map access. This topic is one
-that I have taken for granted until today, and discovering how it is all handled was
-quite an interesting adventure. While the end result of today&amp;rsquo;s post won&amp;rsquo;t be ground
-breaking new ideas, it should give some idea on how I approach a new foreign code base.&lt;/p&gt;
-
-&lt;h2&gt;Digging in for the first time (and failing)&lt;/h2&gt;
-
-&lt;p&gt;I started this adventure because my co-worker Ben brought up that &lt;a href="https://hexdocs.pm/elixir/Access.html" target="_blank"&gt;&lt;code&gt;Access&lt;/code&gt;&lt;/a&gt;
-is an interesting module that we take for granted. Even further than &lt;code&gt;Access&lt;/code&gt;, the
-&lt;a href="https://hexdocs.pm/elixir/Kernel.html#get_in/2" target="_blank"&gt;&lt;code&gt;Kernel&lt;/code&gt;&lt;/a&gt; module has some interesting
-functions related to access. I have never used these before, but I could see them being
-pretty useful.&lt;/p&gt;
-
-&lt;p&gt;I started my journey by pulling down the elixir-lang/elixir github repo. Having this
-locally allows me to do some more powerful searches than Github allows, and also
-works offline. I started with some basic greps for how &lt;code&gt;Access.get&lt;/code&gt; is exposed:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;➜  elixir git:(master) grep -R &amp;quot;Access\.get(&amp;quot; lib/elixir/lib
-lib/elixir/lib/access.ex:  Internally, `data[key]` translates  to `Access.get(term, key, nil)`.
-lib/elixir/lib/kernel.ex:  def get_in(data, [h]), do: Access.get(data, h)
-lib/elixir/lib/kernel.ex:  def get_in(data, [h | t]), do: get_in(Access.get(data, h), t)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Alright. So nothing new is really here. The Elixir language itself only uses &lt;code&gt;Access.get&lt;/code&gt;
-via &lt;code&gt;Kernel.get_in/2&lt;/code&gt;. Okay&amp;hellip;so let&amp;rsquo;s find out how &lt;code&gt;get_in&lt;/code&gt; is used. I&amp;rsquo;ve excluded iex&amp;gt;
-here as that is for docs and wasn&amp;rsquo;t useful for the search:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;➜  elixir git:(master) grep -R &amp;quot;get_in(&amp;quot; lib/elixir/lib | grep -v &amp;quot;iex&amp;quot;
-lib/elixir/lib/kernel.ex:  @spec get_in(Access.t(), nonempty_list(term)) :: term
-lib/elixir/lib/kernel.ex:  def get_in(data, keys)
-lib/elixir/lib/kernel.ex:  def get_in(data, [h]) when is_function(h), do: h.(:get, data, &amp;amp; &amp;amp;1)
-lib/elixir/lib/kernel.ex:  def get_in(data, [h | t]) when is_function(h), do: h.(:get, data, &amp;amp;get_in(&amp;amp;1, t))
-lib/elixir/lib/kernel.ex:  def get_in(nil, [_]), do: nil
-lib/elixir/lib/kernel.ex:  def get_in(nil, [_ | t]), do: get_in(nil, t)
-lib/elixir/lib/kernel.ex:  def get_in(data, [h]), do: Access.get(data, h)
-lib/elixir/lib/kernel.ex:  def get_in(data, [h | t]), do: get_in(Access.get(data, h), t)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Alright&amp;hellip;.so now I&amp;rsquo;ve hit my dead end. I &lt;em&gt;know&lt;/em&gt; that Access.get is what is used for
-accessing a map like &lt;code&gt;map[:key]&lt;/code&gt; as the access.ex file documents as such, but I simply
-can&amp;rsquo;t find it.&lt;/p&gt;
-
-&lt;h2&gt;Start from beginning&lt;/h2&gt;
-
-&lt;p&gt;This is when I remembered something that I saw Chris McCord write in Slack once, he
-likes to use &lt;code&gt;Macro.expand&lt;/code&gt; to see what happens when macros are processed. This gives
-the AST that Elixir is going to compile into erlang, so should give a good lead. I&amp;rsquo;ve
-formatted the following to read more easily:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;iex(1)&amp;gt; Macro.expand((quote do: (map[:a])), __ENV__)
-{
-  {:., [], [Access, :get]},
-  [],
-  [{:map, [], Elixir}, :a]
-}
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Okay, this is what we expected to see but also tells us a lot. When &lt;code&gt;map[:a]&lt;/code&gt; is
-expanded by the Elixir compiler, somehow Access.get is added in. We can see that this
-also works for &lt;code&gt;map[:a][:b]&lt;/code&gt;:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;iex(2)&amp;gt; Macro.expand((quote do: (map[:a][:b])), __ENV__)
-{
-  {:., [], [Access, :get]},
-  [],
-  [
-    {
-      {:., [], [Access, :get]},
-      [],
-      [{:map, [], Elixir}, :a]
-    },
-    :b
-  ]
-}
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;This revealed to me that I missed something crucial in searching the Elixir code:
-I didn&amp;rsquo;t search the compiler source code, which lives in &lt;code&gt;lib/elixir/src&lt;/code&gt;. Let&amp;rsquo;s try
-a search there:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;➜  elixir git:(master) grep -R &amp;quot;Access&amp;quot; lib/elixir/src
-lib/elixir/src/elixir_erl_pass.erl:translate_remote(&amp;#39;Elixir.Access&amp;#39; = Mod, get, Meta, [Container, Value], S) -&amp;gt;
-lib/elixir/src/elixir_parser.yrl:%% Access
-lib/elixir/src/elixir_parser.yrl:  {{&amp;#39;.&amp;#39;, Meta, [&amp;#39;Elixir.Access&amp;#39;, get]}, Meta, [Expr, List]}.
-lib/elixir/src/elixir_rewrite.erl:-define(access, &amp;#39;Elixir.Access&amp;#39;).
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Ahhhh, there we go. The &lt;a href="https://github.com/elixir-lang/elixir/blame/master/lib/elixir/src/elixir_parser.yrl#L846" target="_blank"&gt;Elixir compiler expands on map access&lt;/a&gt;.
-We can then follow the dots backwards to get how this is codified:&lt;/p&gt;
-
-&lt;ol&gt;
-&lt;li&gt;&lt;a href="https://github.com/elixir-lang/elixir/blame/master/lib/elixir/src/elixir_parser.yrl#L280" target="_blank"&gt;&lt;code&gt;build_access&lt;/code&gt; is used in &lt;code&gt;bracket_expr&lt;/code&gt;&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://github.com/elixir-lang/elixir/blame/master/lib/elixir/src/elixir_parser.yrl#L238" target="_blank"&gt;parser notation for different &lt;code&gt;access_expr&lt;/code&gt;&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;Much more parser notation by looking at each variable&lt;/li&gt;
-&lt;/ol&gt;
-
-&lt;p&gt;I won&amp;rsquo;t pretend to know the parser expressions and how they&amp;rsquo;re put together. I suspect
-that I could spend a lot of time researching that topic in particular. However, at this
-point we have our answer: the bracket expressions are handled by the Elixir compiler, and
-expanded into &lt;code&gt;Access.get&lt;/code&gt; calls. They are not handled as normal macros and are engrained
-into the language.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;Thanks for reading the 17th post in my 28 days of Elixir. Keep up through the month of February to see if I can
-stand subjecting myself to &lt;a href="/tags/28-days-of-elixir.html" target="_blank"&gt;28 days of straight writing&lt;/a&gt;. I
-am looking for new topics to write about, so please reach out if there&amp;rsquo;s anything you
-really want to see!&lt;/p&gt;
 </content>
   </entry>
 </feed>
