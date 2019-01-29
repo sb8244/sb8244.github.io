@@ -4,16 +4,177 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2019-01-02T21:59:00-05:00</updated>
+  <updated>2019-01-29T17:04:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>Distributed In-Memory Caching in Elixir</title>
+    <link rel="alternate" href="https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html"/>
+    <id>https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html</id>
+    <published>2019-01-29T17:04:00-05:00</published>
+    <updated>2019-01-29T18:10:53-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I&amp;rsquo;ve been working with implementing our PushEx server at SalesLoft (a bit later than I thought I&amp;rsquo;d have time to) and one
+of the challenges has been to map user identities in our authentication token to a legacy identity that we use in our
+push channels. This is as simple as an HTTP call, but it is also something that could potentially burst very hard and cause
+a large number of downstream HTTP calls. In order to help alleviate this, the identity -&amp;gt; secondary identity will be cached.&lt;/p&gt;
+
+&lt;p&gt;I would typically just throw a cache in redis or memcached, but I really wanted to reach for something simpler in this situation.
+My goals for this project are:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;No external databases introduced (there are none currently on our PushEx implementation)&lt;/li&gt;
+&lt;li&gt;Caching can be persistent between deploys (we roll our deploys so some pods are always online)&lt;/li&gt;
+&lt;li&gt;Caching is conceptually simple in case it needs debugged by another engineer in the future&lt;/li&gt;
+&lt;li&gt;Identity mappings will be stable between services, so time variations are not required. However:&lt;/li&gt;
+&lt;li&gt;Caching will use a TTL to prevent really stale values from being used&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;I&amp;rsquo;m going to walk through the different options I looked at and what I ended up on. The options I passed on aren&amp;rsquo;t necessarily bad,
+they just ended up being operationally or conceptually more difficult than I needed.&lt;/p&gt;
+
+&lt;h1&gt;Swarm&lt;/h1&gt;
+
+&lt;p&gt;There was a great talk in the Atlanta Elixir Meetup recently about using Swarm to manage processes across a cluster. I really liked
+a few things that the presentation demonstrated:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Processes are stable such that restarting a node with the same identity will put the process back on that node&lt;/li&gt;
+&lt;li&gt;Processes are capable of handing themselves off to another node&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;My initial plan was to put Cachex or another store in sharded processes that are distributed across the cluster. However, I soon
+realized that passing off this ets state may be fairly complex and so I ended up looking at the cache as a simple in-process memory
+map. That is actually fine with me, but some other things didn&amp;rsquo;t work out for it.&lt;/p&gt;
+
+&lt;p&gt;The biggest issue that I ran into was that process hand-off became fairly complex to implement. I never actually got that working
+properly after ~4 hours of work on it. Another bigger issue is that there is no process state replication. This means that my shard
+values would have to pass themselves off fully to another node between the time that the node is told to shut down and the near future.
+If the node was forcibly killed before then, the data would be lost and the cache would be re-populated.&lt;/p&gt;
+
+&lt;p&gt;I ended up moving on from this to trying out the next solution because it seemed like I was getting myself into a solution I didn&amp;rsquo;t need.
+That will be a theme in this blog post: there is nothing particularly wrong with technology X, but the trade-offs it brings may be more
+than worth it for the particular use case I&amp;rsquo;m working with.&lt;/p&gt;
+
+&lt;h1&gt;Delta CRDT&lt;/h1&gt;
+
+&lt;p&gt;After talking with my colleague Dan about this topic (he will be presenting on distributed state at Lonestar Elixir Conf and it will be awesome),
+he suggested looking at DeltaCRDT as a potential solution. I really liked this library for a few reasons:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;State is replicated across the cluster, so shutdowns are not frantic&lt;/li&gt;
+&lt;li&gt;CRDT gives a lot of benefit around time variation in the cluster (node A has a different value than node B at a point in time)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;We ended up getting a working solution that used the DeltaCRDT library. Our code looked something like this (don&amp;rsquo;t use this code):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;defmodule SalesloftPusher.AccountLookupCache.Monitor do
+  use GenServer
+
+  def start_link(_) do
+    GenServer.start_link(__MODULE__, [], name: __MODULE__)
+  end
+
+  def init(_) do
+    :net_kernel.monitor_nodes(true)
+
+    {neighbors, []} = :rpc.multicall(Node.list, Process, :whereis, [AccountLookupCache])
+    DeltaCrdt.add_neighbours(AccountLookupCache, neighbors)
+
+    {:ok, []}
+  end
+
+  # Callbacks
+
+  def handle_info({:nodeup, node}, state) do
+    handle_info({:retrynodeup, node, 0}, state)
+  end
+
+  def handle_info({:retrynodeup, node, count}, state) do
+    pid = :rpc.call(node, Process, :whereis, [AccountLookupCache])
+
+    if pid == nil do
+      IO.puts &amp;quot;Node is up, but app not booted, retry = #{count}&amp;quot;
+      Process.send_after(self(), {:retrynodeup, node, count + 1}, 500)
+    else
+      IO.puts &amp;quot;Node is now up #{node} #{inspect(pid)}&amp;quot;
+      DeltaCrdt.add_neighbours(AccountLookupCache, [pid])
+    end
+
+    {:noreply, state}
+  end
+
+  def handle_info({:nodedown, _node}, state) do
+    {:noreply, state}
+  end
+end
+
+usage:
+
+DeltaCrdt.read(AccountLookupCache)
+DeltaCrdt.mutate(AccountLookupCache, :add, [&amp;quot;1111/2&amp;quot;, &amp;quot;4&amp;quot;])
+DeltaCrdt.read(AccountLookupCache)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This is a pretty slick library and the setup was fairly simple. This code may have some edge cases in it that we ran into
+some performance issues with larger data sets. While we did end up moving on from it, the
+author has been working hard on a refactor to improve the speed of the data structure. What&amp;rsquo;s he is doing is way beyond my
+understanding of CRDTs and is pretty inspiring open-source work.&lt;/p&gt;
+
+&lt;p&gt;This issue got me thinking and I realized that I didn&amp;rsquo;t need a lot of the benefits of the CRDT. I wanted replication across
+the cluster, but my values are stable and so time variations won&amp;rsquo;t be a factor. I would most likely have stuck with DeltaCRDT
+at this point if that was a factor, but I ended up moving onto my current solution.&lt;/p&gt;
+
+&lt;h1&gt;Cachex + pg2 Replication&lt;/h1&gt;
+
+&lt;p&gt;My final solution involves a tried and true solution around Cachex + pg2. I&amp;rsquo;ve &lt;a href="/2018/02/17/pg2-basics-use-process-groups-for-orchestration-across-a-cluster.html" target="_blank"&gt;written about pg2&lt;/a&gt;
+in the past and have used it successfully in production on several projects. It essentially let&amp;rsquo;s us
+place our cache processes in a group across the cluster and reference the remote caches as a list.&lt;/p&gt;
+
+&lt;p&gt;The solution presented utilizes Cachex for all local set/get/stat, and passes messages containing
+sets to the cluster using &lt;code&gt;send&lt;/code&gt;. When the cache process starts it notifies all neighbors in pg2
+that it would like a dump of the state and then writes that into Cachex. Here are some strengths
+and weaknesses of the solution:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;+ Boot based (rather than shutdown) based replication so that nodes do not lose data when they go down&lt;/li&gt;
+&lt;li&gt;+ Cachex for local cache management (so we get all of that library&amp;rsquo;s benefits)&lt;/li&gt;
+&lt;li&gt;+ Efficient writing and loading of an export. In testing it took less than 3 seconds for a 1,000,000 key cache locally (higher across network)&lt;/li&gt;
+&lt;li&gt;- The entire cluster being down will cause cache data loss and an increase in misses&lt;/li&gt;
+&lt;li&gt;- There is no consensus on what the right cache is, it&amp;rsquo;s best attempt&lt;/li&gt;
+&lt;li&gt;- Possible flood of binary across network on boot with many nodes&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;The biggest disadvantage is the last one and I think it will be fixed before I take this code into production. It
+is a purely effort based blocker (I need to write the code) and conceptually will work just fine.&lt;/p&gt;
+
+&lt;p&gt;The code is on a gist due to being fairly long: https://gist.github.com/sb8244/371335946d444bd8c5786571cacef4d6&lt;/p&gt;
+
+&lt;h1&gt;Summary&lt;/h1&gt;
+
+&lt;p&gt;In summary, three different potential solutions were evaluated for this distributed caching problem. While
+the first two options utilize great libraries and would be possible to build on, the trade-offs were too much
+for the simplicity of my needs.&lt;/p&gt;
+
+&lt;p&gt;When working on a software project like this, considering what your exact needs are is important and may actually
+lead you away from the typical libraries into a different solution. It may seem obvious for many, but it is very
+easy to get caught up in the libraries that we&amp;rsquo;re hearing about rather than what is best for our particular use case.&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;Thanks for reading! I&amp;rsquo;ll be speaking at &lt;a href="https://lonestarelixir.com/2019/" target="_blank"&gt;Lonestar ElixirConf&lt;/a&gt; about bringing Elixir to production,
+looking at both human and tech challenges in doing so.&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>Understanding Compile Time Dependencies in Elixir - A Bug Hunt</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/01/03/understanding-compile-time-dependencies-in-elixir-a-bug-hunt.html"/>
     <id>https://stephenbussey.com/2019/01/03/understanding-compile-time-dependencies-in-elixir-a-bug-hunt.html</id>
     <published>2019-01-02T21:59:00-05:00</published>
-    <updated>2019-01-02T22:12:42-05:00</updated>
+    <updated>2019-01-11T16:18:07-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -480,25 +641,6 @@ of the API.&lt;/p&gt;
 Dialyzer. However, the core of the library seems to be operating as expected and includes
 a lot of lessons learned from rspec-rcv over the past 2 years. Please reach out
 on Github issues if you see anything you&amp;rsquo;d like fixed or have any questions!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Writing Break</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/02/25/writing-break.html"/>
-    <id>https://stephenbussey.com/2018/02/25/writing-break.html</id>
-    <published>2018-02-25T12:42:00-05:00</published>
-    <updated>2019-01-02T21:43:58-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I recently stopped writing for my 28 days initiative. I figured that I should at
-least post a final closure on it. I ended up traveling unexpected for work in such
-a way that keeping up daily writing would be incredibly hard on me mentally and
-prevent enjoyment of where I am. As such, I ended my 28 days after 18.&lt;/p&gt;
-
-&lt;p&gt;I have a lot of good content still in mind. Most of the content that I want to work
-on is now longer form, requiring much more research or examples to be effective. I hope
-to establish a new cadence in the upcoming weeks to get these posts out.&lt;/p&gt;
 </content>
   </entry>
 </feed>
