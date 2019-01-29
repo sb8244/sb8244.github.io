@@ -13,7 +13,7 @@
     <link rel="alternate" href="https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html"/>
     <id>https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html</id>
     <published>2019-01-29T17:04:00-05:00</published>
-    <updated>2019-01-29T18:10:53-05:00</updated>
+    <updated>2019-01-29T18:13:12-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -131,7 +131,7 @@ at this point if that was a factor, but I ended up moving onto my current soluti
 &lt;h1&gt;Cachex + pg2 Replication&lt;/h1&gt;
 
 &lt;p&gt;My final solution involves a tried and true solution around Cachex + pg2. I&amp;rsquo;ve &lt;a href="/2018/02/17/pg2-basics-use-process-groups-for-orchestration-across-a-cluster.html" target="_blank"&gt;written about pg2&lt;/a&gt;
-in the past and have used it successfully in production on several projects. It essentially let&amp;rsquo;s us
+in the past and have used it successfully in production on several projects. It essentially lets us
 place our cache processes in a group across the cluster and reference the remote caches as a list.&lt;/p&gt;
 
 &lt;p&gt;The solution presented utilizes Cachex for all local set/get/stat, and passes messages containing
