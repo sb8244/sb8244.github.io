@@ -13,7 +13,7 @@
     <link rel="alternate" href="https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html"/>
     <id>https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html</id>
     <published>2019-01-29T17:04:00-05:00</published>
-    <updated>2019-01-29T18:13:12-05:00</updated>
+    <updated>2019-01-29T20:21:24-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -152,6 +152,15 @@ and weaknesses of the solution:&lt;/p&gt;
 is a purely effort based blocker (I need to write the code) and conceptually will work just fine.&lt;/p&gt;
 
 &lt;p&gt;The code is on a gist due to being fairly long: https://gist.github.com/sb8244/371335946d444bd8c5786571cacef4d6&lt;/p&gt;
+
+&lt;p&gt;The end result is a very simple set/get interface which handles all of the distribution and caching.
+I did a few basic performance tests of the system by throwing 10k, 50k, 500k, 1000k k/v
+pairs into the cache and seeing how it performed. Writes and distribution were incredibly fast and rebooting
+the application caused cache availability within a few seconds, well before the app would finish booting for
+kubernetes health checks. There was one caveat I noticed which is that memory usage spiked while loading
+the dumps from remote servers. I believe that the best solution here will involve me changing to a system
+that collects the size of each remote cache and selects the top 1 or 2 sized caches. That will prevent N
+servers from sending full cache dumps and only 1 or 2.&lt;/p&gt;
 
 &lt;h1&gt;Summary&lt;/h1&gt;
 
