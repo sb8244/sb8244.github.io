@@ -146,8 +146,8 @@ DeltaCrdt.mutate(AccountLookupCache, :add, [&quot;1111/2&quot;, &quot;4&quot;])
 DeltaCrdt.read(AccountLookupCache)
 </code></pre>
 
-<p>This is a pretty slick library and the setup was fairly simple. This code may have some edge cases in it that we ran into
-some performance issues with larger data sets. While we did end up moving on from it, the
+<p>This is a pretty slick library and the setup was fairly simple. This code may have some edge cases in it but we ran into
+some performance issues with larger data sets and moved onto another solution. While we did end up moving on from it, the
 author has been working hard on a refactor to improve the speed of the data structure. What&rsquo;s he is doing is way beyond my
 understanding of CRDTs and is pretty inspiring open-source work.</p>
 
@@ -159,7 +159,7 @@ at this point if that was a factor, but I ended up moving onto my current soluti
 
 <p>My final solution involves a tried and true solution around Cachex + pg2. I&rsquo;ve <a href="/2018/02/17/pg2-basics-use-process-groups-for-orchestration-across-a-cluster.html" target="_blank">written about pg2</a>
 in the past and have used it successfully in production on several projects. It essentially lets us
-place our cache processes in a group across the cluster and reference the remote caches as a list.</p>
+place our cache processes in a group across the cluster and reference the remote cache processes as a pid list.</p>
 
 <p>The solution presented utilizes Cachex for all local set/get/stat, and passes messages containing
 sets to the cluster using <code>send</code>. When the cache process starts it notifies all neighbors in pg2
