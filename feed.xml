@@ -4,16 +4,38 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2019-01-29T17:04:00-05:00</updated>
+  <updated>2019-03-01T16:35:00-06:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
   <entry>
+    <title>Monolith to Microservice Without Downtime — A Production Story</title>
+    <link rel="alternate" href="https://stephenbussey.com/2019/03/01/monolith-to-microservice-without-downtime-a-production-story.html"/>
+    <id>https://stephenbussey.com/2019/03/01/monolith-to-microservice-without-downtime-a-production-story.html</id>
+    <published>2019-03-01T16:35:00-06:00</published>
+    <updated>2019-03-01T16:38:19-06:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I am cross-posting for an article that I published on &lt;a href="https://medium.com/salesloft-engineering/monolith-to-microservice-without-downtime-a-production-story-652c9b82f03e" target="_blank"&gt;SalesLoft&amp;rsquo;s Medium blog&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Rather than copying the content over to this blog, I&amp;rsquo;m going to point you at the above Medium post. However, here are the lessons learned from the process:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Migrating from monolith to microservice is not easy. In fact, it involved a lot of nuance in the coding and planning that had to be a forethought and not an afterthought.&lt;/li&gt;
+&lt;li&gt;Stability for customers is the most important part of a refactor like this; our product exists to serve our customers and not to be a microservice-powered entity.&lt;/li&gt;
+&lt;li&gt;Finding the seam in the monolith is important when it comes to stability. If your new code, which shouldn’t be running until it’s ready, causes old requests to fail…that is a problem.&lt;/li&gt;
+&lt;li&gt;The timeline was significantly longer than I anticipated. This is important because we have to prioritize refactoring old code against developing new features and fixing bugs. On the flip side…&lt;/li&gt;
+&lt;li&gt;The slower timeline helped us ensure rock solid stability. We had zero stability concern on release day, which turned out to be like any other normal day.&lt;/li&gt;
+&lt;/ul&gt;
+</content>
+  </entry>
+  <entry>
     <title>Distributed In-Memory Caching in Elixir</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html"/>
     <id>https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html</id>
-    <published>2019-01-29T17:04:00-05:00</published>
-    <updated>2019-01-30T10:32:53-05:00</updated>
+    <published>2019-01-29T16:04:00-06:00</published>
+    <updated>2019-01-30T09:32:53-06:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -184,8 +206,8 @@ looking at both human and tech challenges in doing so.&lt;/p&gt;
     <title>Understanding Compile Time Dependencies in Elixir - A Bug Hunt</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/01/03/understanding-compile-time-dependencies-in-elixir-a-bug-hunt.html"/>
     <id>https://stephenbussey.com/2019/01/03/understanding-compile-time-dependencies-in-elixir-a-bug-hunt.html</id>
-    <published>2019-01-02T21:59:00-05:00</published>
-    <updated>2019-01-11T16:18:07-05:00</updated>
+    <published>2019-01-02T20:59:00-06:00</published>
+    <updated>2019-01-11T15:18:07-06:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -230,8 +252,8 @@ looking at both human and tech challenges in doing so.&lt;/p&gt;
     <title>Announcing PushEx: Open-Source WebSocket Push Server in Elixir</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/12/02/announcing-pushex-open-source-websocket-push-server-in-elixir.html"/>
     <id>https://stephenbussey.com/2018/12/02/announcing-pushex-open-source-websocket-push-server-in-elixir.html</id>
-    <published>2018-12-02T15:00:00-05:00</published>
-    <updated>2019-01-02T21:43:58-05:00</updated>
+    <published>2018-12-02T14:00:00-06:00</published>
+    <updated>2019-01-02T20:43:58-06:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -297,8 +319,8 @@ looking at both human and tech challenges in doing so.&lt;/p&gt;
     <title>Elixir Probes - Replacing Elixometer</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/09/24/elixir-probes-replacing-elixometer.html"/>
     <id>https://stephenbussey.com/2018/09/24/elixir-probes-replacing-elixometer.html</id>
-    <published>2018-09-23T21:44:00-04:00</published>
-    <updated>2019-01-02T21:43:58-05:00</updated>
+    <published>2018-09-23T20:44:00-05:00</published>
+    <updated>2019-01-02T20:43:58-06:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -414,8 +436,8 @@ end
     <title>Elixir Memory - Not Quite Free</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/05/09/elixir-memory-not-quite-free.html"/>
     <id>https://stephenbussey.com/2018/05/09/elixir-memory-not-quite-free.html</id>
-    <published>2018-05-08T23:32:00-04:00</published>
-    <updated>2019-01-02T21:43:58-05:00</updated>
+    <published>2018-05-08T22:32:00-05:00</published>
+    <updated>2019-01-02T20:43:58-06:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -562,96 +584,6 @@ lifecycle and memory consumption that may be more effective in the end.&lt;/p&gt
 &lt;p&gt;Again, I recommend reading &lt;a href="https://s3.us-east-2.amazonaws.com/ferd.erlang-in-anger/text.v1.1.0.pdf" target="_blank"&gt;Erlang in Anger 5, 7&lt;/a&gt;
 and &lt;a href="https://hamidreza-s.github.io/erlang%20garbage%20collection%20memory%20layout%20soft%20realtime/2015/08/24/erlang-garbage-collection-details-and-why-it-matters.html" target="_blank"&gt;Erlang Garbage Collection Details&lt;/a&gt;
 for more detailed information.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Introducing Elixir Response Snapshot Testing</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/04/17/introducing-elixir-response-snapshot-testing.html"/>
-    <id>https://stephenbussey.com/2018/04/17/introducing-elixir-response-snapshot-testing.html</id>
-    <published>2018-04-16T21:53:00-04:00</published>
-    <updated>2019-01-02T21:43:58-05:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I&amp;rsquo;m excited to introduce an Elixir testing library that I&amp;rsquo;ve been working on, as well
-as to explain the general ideas behind it. The library is called Response Snapshot and
-can be found on &lt;a href="https://hex.pm/packages/response_snapshot" target="_blank"&gt;hex&lt;/a&gt;. The work is based on
-my &lt;a href="https://github.com/SalesLoft/rspec-rcv" target="_blank"&gt;rspec-rcv&lt;/a&gt; gem which provides a very similar
-interface and seeks to achieve the same goals.&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;&lt;a href="https://hex.pm/packages/response_snapshot" target="_blank"&gt;hex.pm&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://github.com/sb8244/elixir_response_snapshot" target="_blank"&gt;github.com&lt;/a&gt;&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;h1&gt;What is snapshot testing?&lt;/h1&gt;
-
-&lt;p&gt;I&amp;rsquo;m borrowing this term from Jest, but I think that the concept is fairly simple
-and true to the name. Snapshot testing is testing an API response by collecting
-a valid snapshot of the output and comparing future tests against it. The entire
-API response can be asserted against with a single line of code, and visually verified
-as correct by a human.&lt;/p&gt;
-
-&lt;p&gt;In addition to being able to quickly test response outputs and ensure their shape
-doesn&amp;rsquo;t change over time, the snapshots can be utilized by frontend specs or other
-client systems as an example of valid output. If the frontend specs always use the
-most recent snapshots, any changes to the backend which would break the frontend
-should fail when the frontend specs run.&lt;/p&gt;
-
-&lt;h1&gt;Where does snapshot testing fall short?&lt;/h1&gt;
-
-&lt;p&gt;I would hazard a guess that the idea of snapshot testing makes TDD practitioners
-cringe a bit. In particular, a human has to verify that the snapshot is accurate
-and then commit that into source control. Humans are prone to errors and so this
-could be considered worse than standard tests on a response. I do think that there
-is a place for response assertions in addition to a snapshot, although snapshots
-significantly lower the barrier to entry on testing responses. Without snapshot testing,
-the tests for a response can end up being long, redundant, and a chore to update.&lt;/p&gt;
-
-&lt;p&gt;One of the big challenges in snapshot testing is handling values that change between
-test runs. This is really common with ids, dates, and information generated from
-a library like faker. ResponseSnapshot introduces an optional &lt;code&gt;:keys&lt;/code&gt; mode which
-will not error out if any values are modified. This is most useful when the shape
-of the data should be asserted, but not the exact values. Addition and removal of
-keys would be an error in this mode. Another solution to avoid using keys mode is
-ignored keys. With this, specific path value changes can be ignored. Paths can be
-absolute or wildcards.&lt;/p&gt;
-
-&lt;h1&gt;Getting started in Elixir&lt;/h1&gt;
-
-&lt;p&gt;To get started in Elixir, follow the &lt;a href="https://github.com/sb8244/elixir_response_snapshot#installation" target="_blank"&gt;installation instructions&lt;/a&gt;.
-Capturing your first test involves invoking &lt;code&gt;store_and_compare!/2&lt;/code&gt;. Let&amp;rsquo;s see an
-example:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;test &amp;quot;widgets are listed out&amp;quot;, %{conn: conn} do
-  conn
-  |&amp;gt; get(&amp;quot;/api/widgets&amp;quot;)
-  |&amp;gt; json_response(200)
-  |&amp;gt; ResponseSnapshot.store_and_compare!(path: &amp;quot;widgets/index.json&amp;quot;)
-end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;In practice, you will want to setup your fixture path base and ignore keys that
-change between test runs (such as ids and dates):&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;config :response_snapshot,
-  path_base: &amp;quot;test/fixtures&amp;quot;,
-  ignored_keys: [
-    {&amp;quot;id&amp;quot;, :any_nesting},
-    {&amp;quot;created_at&amp;quot;, :any_nesting},
-  ]
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;The output of the test run will be a fixture file located at &lt;code&gt;test/fixtures/widgets/index.json&lt;/code&gt;.
-This file will include the test file path, the recording time, and the JSON response
-of the API.&lt;/p&gt;
-
-&lt;h1&gt;Next steps&lt;/h1&gt;
-
-&lt;p&gt;For next steps, I&amp;rsquo;d like to bring some best practices to the library, such as using
-Dialyzer. However, the core of the library seems to be operating as expected and includes
-a lot of lessons learned from rspec-rcv over the past 2 years. Please reach out
-on Github issues if you see anything you&amp;rsquo;d like fixed or have any questions!&lt;/p&gt;
 </content>
   </entry>
 </feed>

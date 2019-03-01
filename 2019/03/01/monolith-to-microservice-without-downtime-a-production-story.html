@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Monolith to Microservice Without Downtime — A Production Story</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-62190780.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </header>
+
+      <h1>Monolith to Microservice Without Downtime — A Production Story</h1>
+      <p>I am cross-posting for an article that I published on <a href="https://medium.com/salesloft-engineering/monolith-to-microservice-without-downtime-a-production-story-652c9b82f03e" target="_blank">SalesLoft&rsquo;s Medium blog</a>.</p>
+
+<p>Rather than copying the content over to this blog, I&rsquo;m going to point you at the above Medium post. However, here are the lessons learned from the process:</p>
+
+<ul>
+<li>Migrating from monolith to microservice is not easy. In fact, it involved a lot of nuance in the coding and planning that had to be a forethought and not an afterthought.</li>
+<li>Stability for customers is the most important part of a refactor like this; our product exists to serve our customers and not to be a microservice-powered entity.</li>
+<li>Finding the seam in the monolith is important when it comes to stability. If your new code, which shouldn’t be running until it’s ready, causes old requests to fail…that is a problem.</li>
+<li>The timeline was significantly longer than I anticipated. This is important because we have to prioritize refactoring old code against developing new features and fixing bugs. On the flip side…</li>
+<li>The slower timeline helped us ensure rock solid stability. We had zero stability concern on release day, which turned out to be like any other normal day.</li>
+</ul>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+
+      <div class="signup-footer">
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
