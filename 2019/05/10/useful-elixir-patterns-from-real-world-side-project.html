@@ -113,7 +113,7 @@ application API nor does it leak into other contexts.</p>
 <h1>ListQuery Module</h1>
 
 <p>I really like Ecto&rsquo;s API for querying data, but I have found it cumbersome to build up dynamic queries from API params easily.
-I wrote a <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/users_scim.ex" target="_blank"><code>ListQuery</code></a> some time ago that I brought into this project.</p>
+I wrote a <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/query/list_query.ex" target="_blank"><code>ListQuery</code></a> some time ago that I brought into this project.</p>
 
 <p>The ListQuery is used to take provided <code>params</code> and <code>opts</code> and turns it into an Ecto compatible query. Sometimes advanced
 queries are required and I devised a small way to do that by stripping certain <code>params</code> and then reapplying them. You can
