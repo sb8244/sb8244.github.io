@@ -4,16 +4,152 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2019-03-01T16:35:00-06:00</updated>
+  <updated>2019-05-10T13:00:00-04:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
   <entry>
+    <title>Useful Elixir Patterns from Real-world Side Project</title>
+    <link rel="alternate" href="https://stephenbussey.com/2019/05/10/useful-elixir-patterns-from-real-world-side-project.html"/>
+    <id>https://stephenbussey.com/2019/05/10/useful-elixir-patterns-from-real-world-side-project.html</id>
+    <published>2019-05-10T13:00:00-04:00</published>
+    <updated>2019-05-10T14:39:52-04:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;I believe that one of the best ways to push new practices is to work on a real-world project that we
+can afford to experiment on. We can push the boundary in the toy project while still seeing the results
+of the decisions in a production environment with real users. I&amp;rsquo;ve been fortunate to be able to ship
+several applications like this at SalesLoft. The latest one that we&amp;rsquo;ll look at today is our internal OKR app.&lt;/p&gt;
+
+&lt;p&gt;We&amp;rsquo;ll walk through this project and see several different patterns that I like. Some of these patterns
+have been used in several different projects of mine and have held up well. Others were new experiments
+that I hope to use again in the future.&lt;/p&gt;
+
+&lt;p&gt;The source code for the application can be found on &lt;a href="https://github.com/sb8244/okr_app_pub" target="_blank"&gt;Github&lt;/a&gt;. The useful
+part is the code and tests, less so the specific functionality.&lt;/p&gt;
+
+&lt;h1&gt;Context Usage&lt;/h1&gt;
+
+&lt;p&gt;Contexts, at least as I use them, are all about establishing an application domain and keeping
+the interfaces small and useful for other parts of the system to use. I&amp;rsquo;ve done this in the past but
+really pushed it for this project by having no function usage other than top level modules. This
+pattern allows us to have a well-defined interface for the application, which makes it simpler for both
+us and others to modify the code and understand the consequences.&lt;/p&gt;
+
+&lt;p&gt;As an example, the following would not be acceptable:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;MyApp.SomeContext.ASpecificQuery.execute(params)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Instead, I would prefer this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;MyApp.SomeContext.a_query(params)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;All of my contexts live under the &lt;code&gt;OkrApp&lt;/code&gt; module. You can see a list of them in the &lt;a href="https://github.com/sb8244/okr_app_pub/tree/master/lib/okr_app" target="_blank"&gt;okr_app folder&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;I started off the application by writing code directly in the context. Some of this is still seen because
+I didn&amp;rsquo;t go back through and change everything once I solidified on what I wanted. In the end, I found
+that &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/analytics.ex#L5" target="_blank"&gt;function delegates&lt;/a&gt;
+allowed the context to be very easy to digest and I could write tests for the underlying modules in distinct
+files.&lt;/p&gt;
+
+&lt;p&gt;The hardest part of this pattern, that I haven&amp;rsquo;t figured out yet, is how to handle Ecto schemas between
+contexts. Sometimes, a context needs to leak out. For example, a &lt;code&gt;User&lt;/code&gt; schema may need to be referenced
+by the &lt;code&gt;AnalyticsEvent&lt;/code&gt; schema (as seen &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/analytics/analytics_event.ex#L11" target="_blank"&gt;here&lt;/a&gt;).
+I found this acceptable because I wasn&amp;rsquo;t invoking logic outside of the context interface.&lt;/p&gt;
+
+&lt;p&gt;The advantage of Context came out when I built the &lt;a href="https://github.com/sb8244/okr_app_pub/tree/master/lib/okr_app/mailer" target="_blank"&gt;mailer&lt;/a&gt;.
+I found it very simple to add in this new code without worrying about anything breaking. I was also to extract concepts
+specific to the mailer (such as &lt;code&gt;Recipient&lt;/code&gt;) rather than relying on generic modules prone to change such as &lt;code&gt;User&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h1&gt;Isolated Logic (Context) for SCIM&lt;/h1&gt;
+
+&lt;p&gt;One of the requirements for this project was SCIM (System for Cross-domain Identity Management). We use Okta internally and
+they have a lot of docs on how to write a SCIM integration. I didn&amp;rsquo;t want the details of SCIM leaking into the system too
+heavily. I was able to leverage a SCIM Context to achieve this goal in a way that I am pretty satisfied with.&lt;/p&gt;
+
+&lt;p&gt;SCIM has all of its web functionality extracted into a module called &lt;code&gt;Scim.Web&lt;/code&gt;. &lt;code&gt;Phoenix.Router&lt;/code&gt; is used to provide the
+appropriate endpoint definitions, but the integration happens in a simple &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/scim/web/plug.ex#L13" target="_blank"&gt;Plug&lt;/a&gt;
+which is used by &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app_web/router.ex#L43" target="_blank"&gt;&lt;code&gt;OkrAppWeb.Router&lt;/code&gt;&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;The entire &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/scim/web/users_controller.ex#L9" target="_blank"&gt;SCIM controller&lt;/a&gt; leverages
+a behavior passed into it. This is the &lt;a href="https://en.wikipedia.org/wiki/Strategy_pattern" target="_blank"&gt;strategy pattern&lt;/a&gt; at work.
+I didn&amp;rsquo;t create a specific &lt;code&gt;Behaviour&lt;/code&gt; requirement for this module but probably should have, because it has an expected
+interface.&lt;/p&gt;
+
+&lt;p&gt;The actual SCIM application integration happens in &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/users_scim.ex" target="_blank"&gt;UsersScim&lt;/a&gt;.
+This code is a bit ugly since I didn&amp;rsquo;t clean it up too much, but it&amp;rsquo;s nice that the implementation doesn&amp;rsquo;t leak into my
+application API nor does it leak into other contexts.&lt;/p&gt;
+
+&lt;h1&gt;ListQuery Module&lt;/h1&gt;
+
+&lt;p&gt;I really like Ecto&amp;rsquo;s API for querying data, but I have found it cumbersome to build up dynamic queries from API params easily.
+I wrote a &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/users_scim.ex" target="_blank"&gt;&lt;code&gt;ListQuery&lt;/code&gt;&lt;/a&gt; some time ago that I brought into this project.&lt;/p&gt;
+
+&lt;p&gt;The ListQuery is used to take provided &lt;code&gt;params&lt;/code&gt; and &lt;code&gt;opts&lt;/code&gt; and turns it into an Ecto compatible query. Sometimes advanced
+queries are required and I devised a small way to do that by stripping certain &lt;code&gt;params&lt;/code&gt; and then reapplying them. You can
+see that &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives/store/cycle_store.ex#L11" target="_blank"&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;m able to leverage a &lt;code&gt;ListQuery&lt;/code&gt; powered function in &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app_web/controllers/api/objective_link_controller.ex#L11" target="_blank"&gt;various controllers&lt;/a&gt;
+by passing in the user params. If you use this pattern in an environment with non-friendly users, you should probably sanitize
+the input to not leak any information to the client.&lt;/p&gt;
+
+&lt;h1&gt;SimpleEctoStore Module&lt;/h1&gt;
+
+&lt;p&gt;My contexts use &lt;code&gt;defdelegate&lt;/code&gt; to send queries to a different module. I called the module a &amp;ldquo;store&amp;rdquo; and found myself
+&lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives.ex#L13" target="_blank"&gt;delegating to them often&lt;/a&gt;.
+Writing the same code again and again in the store became a bit cumbersome. Often, I would be writing the most
+simple code possible with just the module name changed.&lt;/p&gt;
+
+&lt;p&gt;My solution to this copy/paste problem was to build a macro powered &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/store/simple_ecto_store.ex" target="_blank"&gt;&lt;code&gt;SimpleEctoStore&lt;/code&gt;&lt;/a&gt;.
+Each usage of &lt;code&gt;SimpleEctoStore&lt;/code&gt; involved passing in the schema module as well as what methods were desired to be
+pulled in. You can see this &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives/store/objective_link_store.ex#L2" target="_blank"&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;This allowed me to remove the boiler plate for a large number of ecto stores. If I used a concept like stores again,
+I would definitely repeat this one.&lt;/p&gt;
+
+&lt;h1&gt;Things that didn&amp;rsquo;t work as well&lt;/h1&gt;
+
+&lt;p&gt;One of the biggest pain points I had was defining how I wanted my JSON API to work. At work, I follow the philosophy of very focused
+endpoints that don&amp;rsquo;t preload many models together. This is for performance and flexibility reasons. Doing that in this project
+made it much more complex for me and was going to take time that I didn&amp;rsquo;t want to spend. The end result here is that I
+have a massive endpoint called &amp;ldquo;Okr&amp;rdquo; that &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app_web/serializers/okr.ex" target="_blank"&gt;embeds many associations&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;The preload for my Okr endpoint is &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives/okr_preloader.ex" target="_blank"&gt;pretty gnarly&lt;/a&gt; as
+well. However, I was thrilled to be able to pass queries into the preload clauses which means that I removed the risk of
+accidentally leaking data that is queried out of the system but then not handled properly by me in Elixir.&lt;/p&gt;
+
+&lt;p&gt;Another thing that I still feel awkward about is a context&amp;rsquo;s schema referencing a different context&amp;rsquo;s schema. I wanted to
+remove this but couldn&amp;rsquo;t figure out how to do so in a way I liked.&lt;/p&gt;
+
+&lt;h1&gt;Summary&lt;/h1&gt;
+
+&lt;p&gt;Contexts allowed for a focused API between parts of an application. Using them saved me some mental gymnastics as I was
+developing the application. I was particularly happy with how I was able to isolate the sort of whacky SCIM API via
+focused context modules.&lt;/p&gt;
+
+&lt;p&gt;&lt;code&gt;ListQuery&lt;/code&gt; and &lt;code&gt;SimpleEctoStore&lt;/code&gt; both made my life easier while defining my ecto based queries and stores. These are generically
+applicable modules that could be brought into other applications if needed.&lt;/p&gt;
+
+&lt;p&gt;I am really happy overall with how this project turned out. It is easy to read through nearly 6 months after I&amp;rsquo;ve originally
+built it and has been running without any Elixir issues since that time. I&amp;rsquo;ll be applying these patterns to future projects,
+for sure, and hope you are able to get some value from it!&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;Thanks for reading! I&amp;rsquo;ll be teaching a class at ElixirConf US about building scalable real-time systems in Elixir. I&amp;rsquo;ve been
+focused a lot on this topic so I&amp;rsquo;m pretty thrilled to share what I&amp;rsquo;ve learned. I believe that registration will open
+soon.&lt;/p&gt;
+</content>
+  </entry>
+  <entry>
     <title>Monolith to Microservice Without Downtime — A Production Story</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/03/01/monolith-to-microservice-without-downtime-a-production-story.html"/>
     <id>https://stephenbussey.com/2019/03/01/monolith-to-microservice-without-downtime-a-production-story.html</id>
-    <published>2019-03-01T16:35:00-06:00</published>
-    <updated>2019-03-01T16:38:19-06:00</updated>
+    <published>2019-03-01T17:35:00-05:00</published>
+    <updated>2019-03-01T17:38:19-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -34,8 +170,8 @@
     <title>Distributed In-Memory Caching in Elixir</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html"/>
     <id>https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html</id>
-    <published>2019-01-29T16:04:00-06:00</published>
-    <updated>2019-01-30T09:32:53-06:00</updated>
+    <published>2019-01-29T17:04:00-05:00</published>
+    <updated>2019-01-30T10:32:53-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -206,8 +342,8 @@ looking at both human and tech challenges in doing so.&lt;/p&gt;
     <title>Understanding Compile Time Dependencies in Elixir - A Bug Hunt</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/01/03/understanding-compile-time-dependencies-in-elixir-a-bug-hunt.html"/>
     <id>https://stephenbussey.com/2019/01/03/understanding-compile-time-dependencies-in-elixir-a-bug-hunt.html</id>
-    <published>2019-01-02T20:59:00-06:00</published>
-    <updated>2019-01-11T15:18:07-06:00</updated>
+    <published>2019-01-02T21:59:00-05:00</published>
+    <updated>2019-01-11T16:18:07-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -252,8 +388,8 @@ looking at both human and tech challenges in doing so.&lt;/p&gt;
     <title>Announcing PushEx: Open-Source WebSocket Push Server in Elixir</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/12/02/announcing-pushex-open-source-websocket-push-server-in-elixir.html"/>
     <id>https://stephenbussey.com/2018/12/02/announcing-pushex-open-source-websocket-push-server-in-elixir.html</id>
-    <published>2018-12-02T14:00:00-06:00</published>
-    <updated>2019-01-02T20:43:58-06:00</updated>
+    <published>2018-12-02T15:00:00-05:00</published>
+    <updated>2019-01-02T21:43:58-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -319,8 +455,8 @@ looking at both human and tech challenges in doing so.&lt;/p&gt;
     <title>Elixir Probes - Replacing Elixometer</title>
     <link rel="alternate" href="https://stephenbussey.com/2018/09/24/elixir-probes-replacing-elixometer.html"/>
     <id>https://stephenbussey.com/2018/09/24/elixir-probes-replacing-elixometer.html</id>
-    <published>2018-09-23T20:44:00-05:00</published>
-    <updated>2019-01-02T20:43:58-06:00</updated>
+    <published>2018-09-23T21:44:00-04:00</published>
+    <updated>2019-01-02T21:43:58-05:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -430,160 +566,6 @@ end
 &lt;p&gt;I haven&amp;rsquo;t seen any downside with Instruments yet that would make me use Elixometer again. It seems much easier to setup, is more obvious to read, and doesn&amp;rsquo;t involve interfacing with an erlang module in a sometimes confusing fashion. Due to all of this, it seems like a great package for setting up StatsD probes.&lt;/p&gt;
 
 &lt;p&gt;I hinted at an open source implementation that uses Instruments. I&amp;rsquo;m working on putting the final touches on the repo and open-sourcing it under the SalesLoft Github org. There will be a blog post when that happens, as I&amp;rsquo;ve been trying to utilize best practices (of the current moment) when building it.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Elixir Memory - Not Quite Free</title>
-    <link rel="alternate" href="https://stephenbussey.com/2018/05/09/elixir-memory-not-quite-free.html"/>
-    <id>https://stephenbussey.com/2018/05/09/elixir-memory-not-quite-free.html</id>
-    <published>2018-05-08T22:32:00-05:00</published>
-    <updated>2019-01-02T20:43:58-06:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I have been working on a shipping an Elixir service at SalesLoft to replace an existing
-piece of functionality in our system with a better version. One of the core changes
-is that the websocket communication of this system will be maintained by Elixir rather
-than by Pusher (our Rails goto). This post is going to explore some of the surprises
-and valuable lessons that I gained while debugging memory leaks in the service.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;I was doing a usual check-in on the service and noticed that the memory for only ~200
-websockets connected was peaking out at over 550MB. This seemed off and meant that
-connecting all users to the service would take many GB of memory. I was at a loss for
-what the problem could be though, but found some help in a useful diagnostic tool.&lt;/p&gt;
-
-&lt;h2&gt;Diagnosing Memory Culprit&lt;/h2&gt;
-
-&lt;p&gt;When doing local development, it&amp;rsquo;s very easy to pop open &lt;code&gt;:observer.start&lt;/code&gt; and get
-a wonderful interface to sift through processes and their memory consumption. However,
-exposing this in production is much more difficult (too difficult in my setup to bother).
-I found the tool &lt;a href="https://github.com/zhongwencool/observer_cli" target="_blank"&gt;observer_cli&lt;/a&gt; and have to
-say that it is one of the greatest tools in my toolbox right now. It is based on the
-well known &lt;code&gt;recon&lt;/code&gt; library, but provides a nice command line interface to visually
-see and sort through process listings. I have to give props to the library maintainer
-for implementing a feature I requested in a matter of days.&lt;/p&gt;
-
-&lt;p&gt;As I was looking at the observer_cli output, I noticed that Phoenix Channel Servers were
-appearing all over the top memory utilizers. Some would take up to 4MB, but averaged at about
-1 MB. For 1000 sockets, this would be between 1GB - 4GB of memory!&lt;/p&gt;
-
-&lt;h2&gt;Understanding Erlang Memory&lt;/h2&gt;
-
-&lt;p&gt;One of my favorite posts on Erlang is by Hamidreza Soleimani, &lt;a href="https://hamidreza-s.github.io/erlang%20garbage%20collection%20memory%20layout%20soft%20realtime/2015/08/24/erlang-garbage-collection-details-and-why-it-matters.html" target="_blank"&gt;Erlang Garbage Collection Details&lt;/a&gt;.
-This post goes over an important detail of how the 2-part Erlang GC works, young and old generational
-heaps. The gist of it is that the major GC operation can collect both young and old heaps,
-but is invoked infrequently as it is a &amp;ldquo;stop the process&amp;rdquo; type of GC. The minor GC
-operation can only collect young heap items, and will mark items as old if they survive
-a GC pass. What does this mean, though?&lt;/p&gt;
-
-&lt;p&gt;In the context of a request, it is possible for an operation to take multiple
-GC minor sweeps and still be referencing all of the allocated binaries (data). When
-this happens, those binaries are going to be marked as old heap and require that
-a full sweep happens to GC them. If the full sweep only happens in certain situations,
-it is possible for the situation to not occur and the full sweep doesn&amp;rsquo;t occur. In
-this case, we have a memory leak. This is exactly what was happening to my websocket.&lt;/p&gt;
-
-&lt;p&gt;It is possible to trigger a GC on the entire node to test out if there is a possible
-memory leak. Note that you don&amp;rsquo;t want to do this in a regular fashion and running
-the major GC may make your debugging sessions less valuable until time passes.&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;# don&amp;#39;t do this often
-Process.list() |&amp;gt; Enum.each(&amp;amp;:erlang.garbage_collect/1)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;h2&gt;Addressing this Memory Leak&lt;/h2&gt;
-
-&lt;p&gt;The websocket request that I&amp;rsquo;ve been discussing was new and a bit different than
-what I&amp;rsquo;ve done in the past. It is an interface to our &lt;a href="https://developers.salesloft.com/api.html" target="_blank"&gt;API&lt;/a&gt; and allows requests
-to be made on the open connection. Due to it being an API request, it would return
-up to 100 items at a time and require multiple pieces of data sourced from other
-services to operate. This equates to 2 things: memory (1-4 MB) and time (multiple minor sweeps).&lt;/p&gt;
-
-&lt;p&gt;&lt;a href="https://s3.us-east-2.amazonaws.com/ferd.erlang-in-anger/text.v1.1.0.pdf" target="_blank"&gt;Erlang in Anger 7.2.2&lt;/a&gt; mentions 5 different ways to fix a memory leak:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;call garbage collection manually at given intervals (icky, but somewhat efficient)&lt;/li&gt;
-&lt;li&gt;stop using binaries (often not desirable)&lt;/li&gt;
-&lt;li&gt;use binary:copy/1-2 if keeping only a small fragment (usually less than 64 bytes) of a larger binary&lt;/li&gt;
-&lt;li&gt;move work that involves larger binaries to temporary one-off processes that will die when they’re done (a lesser form of manual GC!)&lt;/li&gt;
-&lt;li&gt;or add hibernation calls when appropriate (possibly the cleanest solution for inactive processes)&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;&lt;strong&gt;The above is copied from Erlang in Anger verbatim.&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;For the work that this websocket request was doing, it made most sense to utilize
-a short lived process to execute and respond to the request.&lt;/p&gt;
-
-&lt;p&gt;The initial pass at the fix involved using &lt;code&gt;Task.async&lt;/code&gt; and awaiting the response.
-However, this proved to be even worse on memory because sending the response over
-the process barrier was causing the same leak. The solution here ended up being to
-utilize &lt;a href="https://hexdocs.pm/phoenix/Phoenix.Channel.html#socket_ref/1" target="_blank"&gt;&lt;code&gt;Phoenix.Channel socket_ref/1&lt;/code&gt;&lt;/a&gt;
-and responding to the socket request in the &lt;code&gt;Task.start&lt;/code&gt;d process using &lt;code&gt;Phoenix.Channel.reply(ref, reply)&lt;/code&gt;.
-The &lt;code&gt;socket_ref&lt;/code&gt; function is very useful and has some nice side effects. Due to
-serialization of processes, the original approach would block access to the socket
-during a request. With the new approach, the socket can handle multiple requests
-at the same time.&lt;/p&gt;
-
-&lt;h2&gt;Results from Fix&lt;/h2&gt;
-
-&lt;div style="text-align: center"&gt;
-  &lt;img src="/images/erlang-memory/step-1.png" alt="memory drop from 550MB to 250MB" /&gt;
-  &lt;div&gt;
-    &lt;small&gt;
-      &lt;i&gt;Large fix from short lived process&lt;/i&gt;
-    &lt;/small&gt;
-  &lt;/div&gt;
-&lt;/div&gt;
-
-&lt;p&gt;The results from this code change were immediate and apparent. The Phoenix.Channel.Server
-processes that were from 1MB - 4MB were now at 30KB - 60KB. This lead to the massive drop
-in overall memory as seen above.&lt;/p&gt;
-
-&lt;h2&gt;Rinse and Repeat&lt;/h2&gt;
-
-&lt;p&gt;As more sockets were connected to the system, it became clear there was still a memory
-leak. By utilizing the &lt;code&gt;observer_cli&lt;/code&gt; tool, it was possible to see that the cowboy
-websocket processes were hovering at 1-2MB each. Upon discussion in the community Slack, it turns
-out that encoding the large payload suffers from the same type of memory leak that
-was mentioned previously. However, the fix is less optimal due to that code not
-being written by us.&lt;/p&gt;
-
-&lt;p&gt;It appeared that triggering a major GC was the best option.
-Phoenix even accommodates this with a special &lt;a href="https://hexdocs.pm/phoenix/Phoenix.Transports.WebSocket.html#module-garbage-collection" target="_blank"&gt;&lt;code&gt;:garbage_collect&lt;/code&gt;&lt;/a&gt;
-message handler, which is marked as a solution for use after processing large messages.
-We ended up triggering this 5s after the response of our large payload.&lt;/p&gt;
-
-&lt;div style="text-align: center"&gt;
-  &lt;img src="/images/erlang-memory/step-2.png" alt="memory drop from 350MB to 210MB" /&gt;
-  &lt;div&gt;
-    &lt;small&gt;
-      &lt;i&gt;Large fix from manual GC&lt;/i&gt;
-    &lt;/small&gt;
-  &lt;/div&gt;
-&lt;/div&gt;
-
-&lt;p&gt;This memory usage is from significantly more connected sockets than step 1, and we can
-clearly see how large of an impact the manual GC had. The memory is now predictable and
-stable for connected sockets.&lt;/p&gt;
-
-&lt;h2&gt;Final Thoughts&lt;/h2&gt;
-
-&lt;p&gt;This is a very constrained use case, although possibly common, for memory leaks of
-Phoenix websockets. However, the same principles apply to all of the processes we spawn
-in Elixir. When we have a process, and especially with a large number of processes, it
-is important to think about the life cycle of it and how it will play into garbage collection.
-As our processes become longer lived, this becomes even more important as our systems
-will be leaking memory over longer periods of time.&lt;/p&gt;
-
-&lt;p&gt;It seems easiest to just slap a full system GC into every process to keep memory usage
-low (and we can do that if desired), but there are other techniques related to process
-lifecycle and memory consumption that may be more effective in the end.&lt;/p&gt;
-
-&lt;p&gt;Again, I recommend reading &lt;a href="https://s3.us-east-2.amazonaws.com/ferd.erlang-in-anger/text.v1.1.0.pdf" target="_blank"&gt;Erlang in Anger 5, 7&lt;/a&gt;
-and &lt;a href="https://hamidreza-s.github.io/erlang%20garbage%20collection%20memory%20layout%20soft%20realtime/2015/08/24/erlang-garbage-collection-details-and-why-it-matters.html" target="_blank"&gt;Erlang Garbage Collection Details&lt;/a&gt;
-for more detailed information.&lt;/p&gt;
 </content>
   </entry>
 </feed>

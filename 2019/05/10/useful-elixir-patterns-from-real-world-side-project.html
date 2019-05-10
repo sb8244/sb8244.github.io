@@ -1,0 +1,222 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Useful Elixir Patterns from Real-world Side Project</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-62190780.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </header>
+
+      <h1>Useful Elixir Patterns from Real-world Side Project</h1>
+      <p>I believe that one of the best ways to push new practices is to work on a real-world project that we
+can afford to experiment on. We can push the boundary in the toy project while still seeing the results
+of the decisions in a production environment with real users. I&rsquo;ve been fortunate to be able to ship
+several applications like this at SalesLoft. The latest one that we&rsquo;ll look at today is our internal OKR app.</p>
+
+<p>We&rsquo;ll walk through this project and see several different patterns that I like. Some of these patterns
+have been used in several different projects of mine and have held up well. Others were new experiments
+that I hope to use again in the future.</p>
+
+<p>The source code for the application can be found on <a href="https://github.com/sb8244/okr_app_pub" target="_blank">Github</a>. The useful
+part is the code and tests, less so the specific functionality.</p>
+
+<h1>Context Usage</h1>
+
+<p>Contexts, at least as I use them, are all about establishing an application domain and keeping
+the interfaces small and useful for other parts of the system to use. I&rsquo;ve done this in the past but
+really pushed it for this project by having no function usage other than top level modules. This
+pattern allows us to have a well-defined interface for the application, which makes it simpler for both
+us and others to modify the code and understand the consequences.</p>
+
+<p>As an example, the following would not be acceptable:</p>
+
+<pre><code class="elixir">MyApp.SomeContext.ASpecificQuery.execute(params)
+</code></pre>
+
+<p>Instead, I would prefer this:</p>
+
+<pre><code class="elixir">MyApp.SomeContext.a_query(params)
+</code></pre>
+
+<p>All of my contexts live under the <code>OkrApp</code> module. You can see a list of them in the <a href="https://github.com/sb8244/okr_app_pub/tree/master/lib/okr_app" target="_blank">okr_app folder</a>.</p>
+
+<p>I started off the application by writing code directly in the context. Some of this is still seen because
+I didn&rsquo;t go back through and change everything once I solidified on what I wanted. In the end, I found
+that <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/analytics.ex#L5" target="_blank">function delegates</a>
+allowed the context to be very easy to digest and I could write tests for the underlying modules in distinct
+files.</p>
+
+<p>The hardest part of this pattern, that I haven&rsquo;t figured out yet, is how to handle Ecto schemas between
+contexts. Sometimes, a context needs to leak out. For example, a <code>User</code> schema may need to be referenced
+by the <code>AnalyticsEvent</code> schema (as seen <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/analytics/analytics_event.ex#L11" target="_blank">here</a>).
+I found this acceptable because I wasn&rsquo;t invoking logic outside of the context interface.</p>
+
+<p>The advantage of Context came out when I built the <a href="https://github.com/sb8244/okr_app_pub/tree/master/lib/okr_app/mailer" target="_blank">mailer</a>.
+I found it very simple to add in this new code without worrying about anything breaking. I was also to extract concepts
+specific to the mailer (such as <code>Recipient</code>) rather than relying on generic modules prone to change such as <code>User</code>.</p>
+
+<h1>Isolated Logic (Context) for SCIM</h1>
+
+<p>One of the requirements for this project was SCIM (System for Cross-domain Identity Management). We use Okta internally and
+they have a lot of docs on how to write a SCIM integration. I didn&rsquo;t want the details of SCIM leaking into the system too
+heavily. I was able to leverage a SCIM Context to achieve this goal in a way that I am pretty satisfied with.</p>
+
+<p>SCIM has all of its web functionality extracted into a module called <code>Scim.Web</code>. <code>Phoenix.Router</code> is used to provide the
+appropriate endpoint definitions, but the integration happens in a simple <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/scim/web/plug.ex#L13" target="_blank">Plug</a>
+which is used by <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app_web/router.ex#L43" target="_blank"><code>OkrAppWeb.Router</code></a>.</p>
+
+<p>The entire <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/scim/web/users_controller.ex#L9" target="_blank">SCIM controller</a> leverages
+a behavior passed into it. This is the <a href="https://en.wikipedia.org/wiki/Strategy_pattern" target="_blank">strategy pattern</a> at work.
+I didn&rsquo;t create a specific <code>Behaviour</code> requirement for this module but probably should have, because it has an expected
+interface.</p>
+
+<p>The actual SCIM application integration happens in <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/users_scim.ex" target="_blank">UsersScim</a>.
+This code is a bit ugly since I didn&rsquo;t clean it up too much, but it&rsquo;s nice that the implementation doesn&rsquo;t leak into my
+application API nor does it leak into other contexts.</p>
+
+<h1>ListQuery Module</h1>
+
+<p>I really like Ecto&rsquo;s API for querying data, but I have found it cumbersome to build up dynamic queries from API params easily.
+I wrote a <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/users_scim.ex" target="_blank"><code>ListQuery</code></a> some time ago that I brought into this project.</p>
+
+<p>The ListQuery is used to take provided <code>params</code> and <code>opts</code> and turns it into an Ecto compatible query. Sometimes advanced
+queries are required and I devised a small way to do that by stripping certain <code>params</code> and then reapplying them. You can
+see that <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives/store/cycle_store.ex#L11" target="_blank">here</a>.</p>
+
+<p>I&rsquo;m able to leverage a <code>ListQuery</code> powered function in <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app_web/controllers/api/objective_link_controller.ex#L11" target="_blank">various controllers</a>
+by passing in the user params. If you use this pattern in an environment with non-friendly users, you should probably sanitize
+the input to not leak any information to the client.</p>
+
+<h1>SimpleEctoStore Module</h1>
+
+<p>My contexts use <code>defdelegate</code> to send queries to a different module. I called the module a &ldquo;store&rdquo; and found myself
+<a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives.ex#L13" target="_blank">delegating to them often</a>.
+Writing the same code again and again in the store became a bit cumbersome. Often, I would be writing the most
+simple code possible with just the module name changed.</p>
+
+<p>My solution to this copy/paste problem was to build a macro powered <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/store/simple_ecto_store.ex" target="_blank"><code>SimpleEctoStore</code></a>.
+Each usage of <code>SimpleEctoStore</code> involved passing in the schema module as well as what methods were desired to be
+pulled in. You can see this <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives/store/objective_link_store.ex#L2" target="_blank">here</a>.</p>
+
+<p>This allowed me to remove the boiler plate for a large number of ecto stores. If I used a concept like stores again,
+I would definitely repeat this one.</p>
+
+<h1>Things that didn&rsquo;t work as well</h1>
+
+<p>One of the biggest pain points I had was defining how I wanted my JSON API to work. At work, I follow the philosophy of very focused
+endpoints that don&rsquo;t preload many models together. This is for performance and flexibility reasons. Doing that in this project
+made it much more complex for me and was going to take time that I didn&rsquo;t want to spend. The end result here is that I
+have a massive endpoint called &ldquo;Okr&rdquo; that <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app_web/serializers/okr.ex" target="_blank">embeds many associations</a>.</p>
+
+<p>The preload for my Okr endpoint is <a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives/okr_preloader.ex" target="_blank">pretty gnarly</a> as
+well. However, I was thrilled to be able to pass queries into the preload clauses which means that I removed the risk of
+accidentally leaking data that is queried out of the system but then not handled properly by me in Elixir.</p>
+
+<p>Another thing that I still feel awkward about is a context&rsquo;s schema referencing a different context&rsquo;s schema. I wanted to
+remove this but couldn&rsquo;t figure out how to do so in a way I liked.</p>
+
+<h1>Summary</h1>
+
+<p>Contexts allowed for a focused API between parts of an application. Using them saved me some mental gymnastics as I was
+developing the application. I was particularly happy with how I was able to isolate the sort of whacky SCIM API via
+focused context modules.</p>
+
+<p><code>ListQuery</code> and <code>SimpleEctoStore</code> both made my life easier while defining my ecto based queries and stores. These are generically
+applicable modules that could be brought into other applications if needed.</p>
+
+<p>I am really happy overall with how this project turned out. It is easy to read through nearly 6 months after I&rsquo;ve originally
+built it and has been running without any Elixir issues since that time. I&rsquo;ll be applying these patterns to future projects,
+for sure, and hope you are able to get some value from it!</p>
+
+<hr>
+
+<p>Thanks for reading! I&rsquo;ll be teaching a class at ElixirConf US about building scalable real-time systems in Elixir. I&rsquo;ve been
+focused a lot on this topic so I&rsquo;m pretty thrilled to share what I&rsquo;ve learned. I believe that registration will open
+soon.</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+
+      <div class="signup-footer">
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
