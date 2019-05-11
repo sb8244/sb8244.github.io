@@ -13,14 +13,14 @@
     <link rel="alternate" href="https://stephenbussey.com/2019/05/10/useful-elixir-patterns-from-real-world-side-project.html"/>
     <id>https://stephenbussey.com/2019/05/10/useful-elixir-patterns-from-real-world-side-project.html</id>
     <published>2019-05-10T13:00:00-04:00</published>
-    <updated>2019-05-10T16:35:01-04:00</updated>
+    <updated>2019-05-11T09:45:22-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
     <content type="html">&lt;p&gt;I believe that one of the best ways to push new practices is to work on a real-world project that we
 can afford to experiment on. We can push the boundary in the toy project while still seeing the results
 of the decisions in a production environment with real users. I&amp;rsquo;ve been fortunate to be able to ship
-several applications like this at SalesLoft. The latest one that we&amp;rsquo;ll look at today is our internal OKR app.&lt;/p&gt;
+several applications like this at SalesLoft. The latest one that we&amp;rsquo;ll look at today is our internal OKR (Objective-Key Result) app that we use for goal tracking and alignment.&lt;/p&gt;
 
 &lt;p&gt;We&amp;rsquo;ll walk through this project and see several different patterns that I like. Some of these patterns
 have been used in several different projects of mine and have held up well. Others were new experiments
