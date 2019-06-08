@@ -1,0 +1,234 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Elixir Makes Testing Hard Things Easy</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-62190780.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </header>
+
+      <h1>Elixir Makes Testing Hard Things Easy</h1>
+      <p>I love Elixir. If we&rsquo;ve talked at a conference or you work with me, you know this. I constantly find small nuggets
+when working with Elixir that simply bring joy to me. One of these nuggets recently emerged that I thought worth
+sharing.</p>
+
+<h1>Backstory</h1>
+
+<p>I&rsquo;m working on some learning material right now for real-time system development. One of the key aspects of a section
+is about how important measurement is. Without measurement, how do we have any confidence that our running system
+is healthy?</p>
+
+<p>I&rsquo;m using StatsD for this section because it&rsquo;s fairly well-adopted and is conceptually simple to understand. However,
+I kept bumping into small inefficiencies in my flow. An example of this is that I use a Node program called <code>statsd-logger</code>
+to view my metrics in development. It felt a bit strange to have a reader install this Node program to view logs in our
+Elixir app.</p>
+
+<p>The same problem came up today when I was writing tests for the StatsD metrics. I would typically use Mockery to test that
+Statix, my client, is correctly called. If I went down this path, I&rsquo;d be putting a lot on the reader in terms of understanding
+what the heck a mock is and when to use it. Ideally, we&rsquo;ll have 1 line of code max additional setup.</p>
+
+<p>Okay, enough of the backstory. I wanted to fix these two very specific problems. Let&rsquo;s get into the more interesting bits.</p>
+
+<h1>Elixir is Many Programs</h1>
+
+<p>Elixir runs processes in a way that makes them feel like little independent programs. We can spin up tens of thousands of these
+programs without any issue at all. We can even spin up programs that we may consider expensive, such as a webserver.</p>
+
+<p>The real jewel of these many programs is that they are given a simple and efficient way to communicate with each other, message
+passing. To take the web server example to the extreme, we could spin up 5 different servers on 5 ports and interface with them
+through our browser. Behind the scenes, these &ldquo;servers&rdquo; would be in the same Elixir VM and could be passing messages back and forth
+nearly freely.</p>
+
+<p>This is conceptually interesting, to me, because it means that traditionally complex or standalone applications can be run in the
+same program (very easily) and can share information.</p>
+
+<p>Let&rsquo;s see how this applies to StatsD.</p>
+
+<h1>Just run a Server</h1>
+
+<p>What if we just ran a StatsD server in our Elixir application? It could listen on a port and accept messages. We could do whatever
+we wanted with these messages, like log them out or store them. Let&rsquo;s do that in a few lines of code:</p>
+
+<pre><code class="elixir">$ iex
+iex(1)&gt; :gen_udp.open(8126, active: true)
+</code></pre>
+
+<p>We&rsquo;ve started a &ldquo;UDP server&rdquo; in our terminal. Let&rsquo;s send it some messages (open new terminal):</p>
+
+<pre><code class="elixir"># Your mileage may vary, fingers crossed
+$ echo -n &quot;hello:1&quot; | nc -4u -w0 localhost 8126
+$ echo -n &quot;hello:2&quot; | nc -4u -w0 localhost 8126
+</code></pre>
+
+<p>Now let&rsquo;s go back to the original iex terminal:</p>
+
+<pre><code class="elixir">iex(2)&gt; flush()
+{:udp, #Port&lt;0.5&gt;, {127, 0, 0, 1}, 61814, &#39;hello:1&#39;}
+{:udp, #Port&lt;0.5&gt;, {127, 0, 0, 1}, 61515, &#39;hello:2&#39;}
+:ok
+</code></pre>
+
+<p>Woah! We received the UDP packets as messages to our process. That&rsquo;s super neat to me because of how simple it was (due to
+the great backing work of Erlang/OTP.)</p>
+
+<p>So what if this was the solution to problem 1 (statsd-logger)? We could start a UDP server and log out messages. I threw together
+a quick library for that purpose called <a href="https://github.com/sb8244/statsd_logger" target="_blank">StatsDLogger</a>.</p>
+
+<p>That worked out nicely. What about testing, though? Let&rsquo;s take what we just wrote and apply it to tests.</p>
+
+<h1>Test Anything Easily</h1>
+
+<p>Testing can sometimes be hard. Integration testing across multiple servers is usually hard. What level do we start to mock at? We can&rsquo;t
+actually run all of our services all of the time without having very slow tests. To help solve this, we can take what we just did and apply it to
+tests. There is a key question though, how do we actually write an assertion against our server?</p>
+
+<p>In Elixir, message passing is champion. If you have a process&rsquo;s ID, you can send it a message and it will go into that process&rsquo;s mailbox.
+With ExUnit, this mailbox can be asserted against by using <code>assert_receive</code>. This means that if we can send our test process
+a message, we can write a test for it.</p>
+
+<p>It&rsquo;s slightly harder to boil this concept down into an example as simple as the last. Let&rsquo;s look at some code I wrote to
+handle this for StatsD:</p>
+
+<pre><code class="elixir">  def handle(:valid, name, value, opts) do
+    pid = Keyword.fetch!(opts, :send_to)
+    send(pid, {:statsd_recv, name, value})
+  end
+</code></pre>
+
+<p>We can handle a metric by sending a message to a pid. Now the question is, &ldquo;which pid?&rdquo; The process that calls <code>start_link</code>
+can be referenced with <code>self()</code>. This means we can do something like this:</p>
+
+<pre><code class="elixir">  def start_link(opts) do
+    opts = Keyword.merge([send_to: self()], opts)
+    GenServer.start_link(__MODULE__, opts)
+  end
+</code></pre>
+
+<p>We can put all of this together to write a test like this:</p>
+
+<pre><code class="elixir">  test &quot;valid / invalid messages are handled&quot; do
+    StatsDLogger.start_link(port: @port, formatter: :send)
+
+    send_event(&quot;a:1&quot;)
+    send_event(&quot;a:2|c&quot;)
+    send_event(&quot;invalid&quot;)
+
+    assert_receive {:statsd_recv, &quot;a&quot;, &quot;1&quot;}
+    assert_receive {:statsd_recv, &quot;a&quot;, &quot;2|c&quot;}
+    assert_receive {:statsd_recv_invalid, &quot;invalid&quot;}
+  end
+</code></pre>
+
+<p>Elixir has made testing this multi-server integration a piece of cake.</p>
+
+<h1>In the Wild</h1>
+
+<p>I&rsquo;m definitely not finding any new technique here. The reason I love Elixir is that gems like this are all over open-source
+libraries. The one that comes to mind here is <a href="https://github.com/PSPDFKit-labs/bypass" target="_blank">Bypass</a>.</p>
+
+<p>Bypass works by starting an anonymous HTTP server that runs a function when it&rsquo;s invoked. That is a great example of &ldquo;start a
+server&rdquo; to solve how to test that an application makes the right request.</p>
+
+<p>Phoenix Channels are a great example of &ldquo;send a message&rdquo; in the wild. When you write <code>assert_push</code>, you&rsquo;re actually just
+<a href="https://github.com/phoenixframework/phoenix/blob/master/lib/phoenix/test/channel_test.ex#L481" target="_blank">checking for a specific message</a>.
+The Channel test is wired up so that the test process becomes the &ldquo;socket transport.&rdquo; This allows it to be at the edge of the system
+and capture a lot of test for very little code.</p>
+
+<h1>Wrapping Up</h1>
+
+<p>If you&rsquo;re here, thanks for making it through. I love Elixir because of small things like this that would actually be huge in some
+other languages I&rsquo;ve worked with. If you&rsquo;re looking for a way to test complex code, try out message passing as a potential solution.</p>
+
+<h1>Shameless Plug for ElixirConf</h1>
+
+<p>My colleague Grant and I are going to give a great training session at ElixirConf Tuesday course. You
+can find more details at <a href="https://elixirconf.com/2019/training-classes/2" target="_blank">https://elixirconf.com/2019/training-classes/2</a>. We&rsquo;ll
+be focused on writing real-time systems, and will specifically be leveraging a lot of real world lessons from doing this at
+decent scale on several pieces of our SaaS app. Come check it out!</p>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+
+      <div class="signup-footer">
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
