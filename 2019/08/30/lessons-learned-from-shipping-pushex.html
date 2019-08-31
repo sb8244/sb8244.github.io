@@ -1,0 +1,217 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Lessons Learned from Shipping PushEx</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-62190780.css" rel="stylesheet" />
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </header>
+
+      <h1>Lessons Learned from Shipping PushEx</h1>
+      <p>It&rsquo;s been a while since I announced the initial open-source release of PushEx. We had a few small challenges to solve
+in order to roll it out, and then I let it bake for several months to ensure that it is stable in production. It has
+been running for several months now at production scale, and I cut the first official release of it
+on <a href="https://hex.pm/packages/push_ex" target="_blank">hex.pm</a> today. These are some of the challenges and lessons learned from running
+it in production.</p>
+
+<h2>The project was a big success</h2>
+
+<p>Let&rsquo;s start with the good news.
+Our goal with the project was to replace our existing push provider, in order to have more control over an important
+part of our tech stack. By &ldquo;push provider&rdquo;, I mean a service that sends data from servers to clients in real-time.
+We needed to replace multiple JavaScript clients and we needed to ensure that the
+pushes were getting queued up from our servers properly.</p>
+
+<p>This process went very well, due to careful planning and testing on our end. We ran both systems in parallel
+for some time, and slowly ramped the number of pushes from 0 to 100%. Throughout this process, we pushed data to clients
+but did not use it there. We became confident enough to consume the data on the clients through a slow rollout process.
+At this point, the connections to our old provider dropped.</p>
+
+<p>We were able to avoid downtime or problems throughout this process by very carefully monitoring the application. We
+stopped the rollout at the first sign of trouble, and then resumed once we understood the root cause.</p>
+
+<h2>The order of process shutdown matters</h2>
+
+<p>We encountered a large number of errors during the deployment process of the application. This never occurred during
+normal operation, so it seemed a bit odd. The root cause of the errors was that the application would still receive
+requests as it was shutting down. This caused messages to try to push to clients, but the processes involved in that
+were already shut down. This can happen with a Supervisor structure like:</p>
+
+<pre><code>[
+  PushExWeb.Endpoint,
+  PushEx.Pipeline
+]
+</code></pre>
+
+<p>If the pipeline shuts down while the Endpoint is still online, web requests will encounter errors. A better layout
+might look like:</p>
+
+<pre><code>[
+  PushEx.Pipeline,
+  PushExWeb.Endpoint,
+  PushExWeb.ConnectionDrainer
+]
+</code></pre>
+
+<p>In order to gain control over the shutdown process of PushEx, I had to make changes to the application supervision tree. I separated
+the <a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex/application.ex#L10" target="_blank">starting of PushEx&rsquo;s core system</a>
+from the <a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex/supervisor.ex#L11" target="_blank">web portion</a>.
+These changes allow the entire web stack to be gracefully go offline (complete with connection draining) before the data
+pipeline goes offline.</p>
+
+<p>This leads into the next problem&mdash;how to prevent data loss during application shutdown.</p>
+
+<h2>Connection draining is critical</h2>
+
+<p>Connection draining allows a web server to gracefully wait for connections to close before it proceeds with shutting down more of the application.
+HTTP connection draining shuts down the listener process that would accept new connections.</p>
+
+<p>Several layers of draining are required for PushEx to gracefully exit. They are:</p>
+
+<ul>
+<li><a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex_web/channels/socket_drainer.ex" target="_blank">Socket draining</a> (sockets should gracefully disconnect)</li>
+<li><a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex/supervisor.ex#L23" target="_blank">Ranch connection draining</a> (new web requests shouldn&rsquo;t be handled)</li>
+<li><a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex/push/drainer.ex" target="_blank">Push Pipeline draining</a> (data in
+flight should be given a chance of delivery)</li>
+</ul>
+
+<p>You&rsquo;ll notice that Socket draining is implemented separately from the connection draining. This is because the connection draining API stops
+the listener from accepting new connections only. If a connection is already established, it has to be manually killed or shut down.</p>
+
+<p>This process was complex to get right, but now we can reboot servers without errors and without losing data. All of our data
+drains out within the 30 second limit, so your mileage would vary if that&rsquo;s not the case.</p>
+
+<h2>Big topics affect performance</h2>
+
+<p>We have a few large push topics in our application. It can be costly for Phoenix Tracker to have a large number of joins in a very short period of time.
+The solution for PushEx is to allow certain topics to not use Tracker. When an ignored topic
+is <a href="https://github.com/pushex-project/pushex/blob/62efb769e6bb3472f4b4635e9e98a5f6f1c346f7/lib/push_ex_web/channels/push_tracker.ex#L32" target="_blank">tracked</a>
+or <a href="https://github.com/pushex-project/pushex/blob/62efb769e6bb3472f4b4635e9e98a5f6f1c346f7/lib/push_ex_web/channels/push_tracker.ex#L43" target="_blank">questioned</a>,
+it always responds with <code>true</code>.</p>
+
+<p>The likelihood that a large topic has 0 connected clients is close to 0, so it is acceptable to treat it like it always has clients. We don&rsquo;t
+want to treat small topics as if they always have connected clients, or we&rsquo;d do more work than necessary.</p>
+
+<h2>Keep-Alive to dramatically increase API throughput</h2>
+
+<p>I was a bit shocked when I implemented the server API calls in our Ruby app. We were used to 20ms calls to our old provider, but the new
+one was hitting 200ms! We traced the root cause to DNS slowness when establishing the connection. The solution was to utilize Keep-Alive
+connection pooling.</p>
+
+<p>The Keep-Alive header makes it so that the connection is not closed after a response is sent. The connection is open to accept more requests
+and can do so without the overhead of establishing a connection. This dramatically increased the throughput of our Ruby servers to the
+PushEx API endpoint. We didn&rsquo;t quite hit the 20ms goal, but it was close enough to call it a win.</p>
+
+<p>I did hit a snag here. The connection draining for Keep-Alive connections suffers from the same problem as WebSockets do&mdash;they
+don&rsquo;t close when the listener is closed. I had to do a bit of hackery to set a global value indicating that the Keep-Alive connection should
+be <a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex_web/controllers/push_controller.ex#L32" target="_blank">closed on the next request</a>.
+This is a hack that I wish I didn&rsquo;t have to do, but it did have the desired impact.</p>
+
+<h2>Wrapping Up</h2>
+
+<p>There were lots of challenges in rolling out the first major PushEx release, but the end result is solid. We&rsquo;re running at pretty high throughput
+on a low number of small servers (2GB + 2VCPU for this app) without issue.</p>
+
+<p>The snags we hit are not unique to our application. When building an Elixir application, you should consider both the startup and shutdown order
+of your process tree. Use connection draining to avoid new connections being made to a server that is in the process of shutting down. Leverage
+Keep-Alive headers for server-to-server API requests, especially if the throughput is high. These things do come with tradeoffs, however, so
+your mileage may vary.</p>
+
+<h2>The Book Plug</h2>
+
+<p>My book &ldquo;Real-Time Phoenix: Build Highly Scalable Systems with Channels&rdquo; is now in beta
+through <a href="https://pragprog.com/book/sbsockets/real-time-phoenix" target="_blank">The Pragmatic Bookshelf</a>. This book captures the victories and struggles that
+we face when building real-time applications in Elixir.</p>
+
+<div style="text-align: center">
+  <a href="https://pragprog.com/book/sbsockets/real-time-phoenix" target="_blank">
+    <img src="/images/sbsockets.jpg" alt="Real-Time Phoenix by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" />
+  </a>
+</div>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+
+      <div class="signup-footer">
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+        slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
