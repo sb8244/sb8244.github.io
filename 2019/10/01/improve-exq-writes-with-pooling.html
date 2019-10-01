@@ -5,7 +5,7 @@
     <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Stephen Bussey - Improve ExQ Writes With Pooling</title>
+    <title>Stephen Bussey - Improve Exq Writes With Pooling</title>
     <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
     <link href="/styles/style-62190780.css" rel="stylesheet" />
     <link href="/styles/atom-one-light-eda63d8c.css" rel="stylesheet" />
@@ -42,7 +42,7 @@
 
       </header>
 
-      <h1>Improve ExQ Writes With Pooling</h1>
+      <h1>Improve Exq Writes With Pooling</h1>
       <p><a href="https://hex.pm/packages/exq" target="_blank">Exq</a> is a background job processing library written in Elixir. It uses Redis, via the
 Redix library, to store and then retrieve jobs. In this post, we&rsquo;ll look at the performance of writing jobs into Redis
 via the <code>Exq.Enqueuer</code> API. You&rsquo;ll see several benchmarks that utilize a single <code>Enqueuer</code>, a poolboy queue, and a named
