@@ -4,16 +4,265 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2019-08-30T17:55:00-06:00</updated>
+  <updated>2019-10-01T00:26:00-04:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
   <entry>
+    <title>Improve ExQ Writes With Pooling</title>
+    <link rel="alternate" href="https://stephenbussey.com/2019/10/01/improve-exq-writes-with-pooling.html"/>
+    <id>https://stephenbussey.com/2019/10/01/improve-exq-writes-with-pooling.html</id>
+    <published>2019-10-01T00:26:00-04:00</published>
+    <updated>2019-10-01T01:47:20-04:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;&lt;a href="https://hex.pm/packages/exq" target="_blank"&gt;Exq&lt;/a&gt; is a background job processing library written in Elixir. It uses Redis, via the
+Redix library, to store and then retrieve jobs. In this post, we&amp;rsquo;ll look at the performance of writing jobs into Redis
+via the &lt;code&gt;Exq.Enqueuer&lt;/code&gt; API. You&amp;rsquo;ll see several benchmarks that utilize a single &lt;code&gt;Enqueuer&lt;/code&gt;, a poolboy queue, and a named
+process pool.&lt;/p&gt;
+
+&lt;p&gt;The repo for the benchmark and sample application is at &lt;a href="https://github.com/sb8244/exq-throughput" target="_blank"&gt;https://github.com/sb8244/exq-throughput&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2&gt;The Problem&lt;/h2&gt;
+
+&lt;p&gt;Background job processing libraries write their jobs into a persistent storage mechanism and then retrieve those jobs
+in the future. If you&amp;rsquo;ve used Ruby, you may be familiar with Sidekiq. The act of writing to Redis is very fast, but there
+can be overhead at multiple levels. If the overhead is too high, then writing jobs to Redis becomes slow and the application
+may become backed up. This can lead to errors or even a loss of service, if acknowledged persistence of a job is required.&lt;/p&gt;
+
+&lt;h2&gt;Types of Overhead&lt;/h2&gt;
+
+&lt;p&gt;The most common overhead that I&amp;rsquo;ve seen is the backup of Redis commands being executed end-to-end serially. This happens
+when you use a single connection to write to Redis, and can occur in any language. The issue arises because a single connection can only
+send one command at a time. It must then wait for the response before another command can occur. Redis is single-threaded, so it may not
+be obvious why this is an issue. The problem is that the network overhead is done serially in this type of system—each write has to
+go over the network and back before the next starts.&lt;/p&gt;
+
+&lt;p&gt;The following diagram shows the speed of three hypothetical Redis requests:&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/ExqPool/redis_serialization.svg"
+       alt="Redis single connection versus pooled connection. Pooled connection completes 3 requests much faster."
+       height="375px" /&gt;
+  &lt;p&gt;
+    &lt;small&gt;&lt;i&gt;Redis single connection versus pooled connection. Pooled connection completes 3 requests much faster.&lt;/i&gt;&lt;/small&gt;
+  &lt;/p&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Each connection sends a command that goes over the network to Redis, which processes the command. A response is returned
+and also goes over the network. In the real-world, this network latency might be 1ms or less. However, the end result is that
+the requests complete much faster when multiple commands can be simultaneously sent via multiple connections.&lt;/p&gt;
+
+&lt;p&gt;Another type of overhead is the fact that an Elixir process handles messages serially. If a job is enqueued via a single
+process, the same problem as a single connection emerges.&lt;/p&gt;
+
+&lt;h2&gt;The Problem in Exq&lt;/h2&gt;
+
+&lt;p&gt;Exq enqueues jobs through the &lt;code&gt;Exq.Enqueuer&lt;/code&gt; process. This is a single process that holds a single redis connection. Each enqueue
+task goes through this one process, serially. If serial processes and single connections lead to less throughput, then this is
+will limit the throughput of Exq enqueueing.&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s move into what we can do about it, and then benchmarks.&lt;/p&gt;
+
+&lt;h2&gt;Pool Processes to Increase Throughput&lt;/h2&gt;
+
+&lt;p&gt;The solution to the problem above is to pool processes, so that multiple Redis commands can be sent to Redis in the same moment
+of time. There are two main ways that I&amp;rsquo;ve done this in Elixir: poolboy and named pools.&lt;/p&gt;
+
+&lt;h4&gt;Poolboy&lt;/h4&gt;
+
+&lt;p&gt;&lt;a href="https://github.com/devinus/poolboy" target="_blank"&gt;Poolboy&lt;/a&gt; is a nifty Erlang library that can create a pool of any process you want. We could
+pool &lt;code&gt;Exq.Enqueuer&lt;/code&gt; processes and then enqueue jobs by using the poolboy functions. Let&amp;rsquo;s see how we&amp;rsquo;d do that:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;defmodule ExqThroughput.Application do
+  use Application
+
+  def start(_type, _args) do
+    children =
+      [
+        :poolboy.child_spec(:worker, poolboy_config())
+      ]
+
+    opts = [strategy: :one_for_one, name: ExqThroughput.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+
+  def enqueuer_pool_size(), do: :erlang.system_info(:schedulers_online)
+
+  def poolboy_config() do
+    [
+      {:name, {:local, :enqueuer}},
+      {:worker_module, ExqThroughput.PooledEnqueuer},
+      {:size, enqueuer_pool_size()}
+    ]
+  end
+end
+
+defmodule ExqThroughput.PooledEnqueuer do
+  def start_link(_) do
+    # Hack to make Exq happy with running
+    num = :rand.uniform(100_000_000) + 100
+    name = :&amp;quot;Elixir.Exq#{num}&amp;quot;
+    Exq.Enqueuer.start_link(name: name)
+
+    # We need to put the enqueuer instance into the pool
+    {:ok, Process.whereis(:&amp;quot;#{name}.Enqueuer&amp;quot;)}
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;There is a bit of a hack in the &lt;code&gt;PooledEnqueuer&lt;/code&gt; module to make Exq happy. There may be another way to get around this, but I went
+for a quick solution for the purpose of this benchmark. There is also a bit of working around the Exq process tree to get access
+directly to the Enqueuer process.&lt;/p&gt;
+
+&lt;p&gt;We can now enqueue a job by first checking out the poolboy process:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;:poolboy.transaction(:enqueuer, fn pid -&amp;gt;
+  Exq.enqueue(pid, &amp;quot;throughput_queue&amp;quot;, Worker, [])
+end)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Named process pooling looks a bit different than this.&lt;/p&gt;
+
+&lt;h4&gt;Named Processes&lt;/h4&gt;
+
+&lt;p&gt;You can start multiple processes in Elixir and give them a name like &lt;code&gt;MyProcess1&lt;/code&gt;, &lt;code&gt;MyProcess2&lt;/code&gt;, etc. When you want to send a
+message to the process, you would send a message to &lt;code&gt;:&amp;quot;Elixir.MyProcess#{:rand.uniform(2)}&amp;quot;&lt;/code&gt;. This is named process pooling, and is
+conceptually very simple—this makes it easier to setup.&lt;/p&gt;
+
+&lt;p&gt;We have to start the pool of processes in the application:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;defmodule ExqThroughput.Application do
+  use Application
+
+  def start(_type, _args) do
+    children = named_enqueuer_pool(enqueuer_pool_size())
+    opts = [strategy: :one_for_one, name: ExqThroughput.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+
+  def enqueuer_pool_size(), do: :erlang.system_info(:schedulers_online)
+
+  defp named_enqueuer_pool(count) do
+    for i &amp;lt;- 1..count do
+      name = :&amp;quot;Elixir.Exq#{i}&amp;quot;
+
+      %{
+        id: name,
+        start: {Exq.Enqueuer, :start_link, [[name: name]]}
+      }
+    end
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;We can then enqueue work by directly using these processes:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;def named_enqueue() do
+  num = :rand.uniform(ExqThroughput.Application.enqueuer_pool_size())
+  Exq.enqueue(:&amp;quot;Elixir.Exq#{num}.Enqueuer&amp;quot;, &amp;quot;throughput_queue&amp;quot;, Worker, [])
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;I love this approach due to its simplicity. Let&amp;rsquo;s see how all of the approaches stack up.&lt;/p&gt;
+
+&lt;h2&gt;Benchmark&lt;/h2&gt;
+
+&lt;p&gt;Benchee is used to benchmark three scenarios: single process, poolboy, named processes. Benchee is ran with various
+parallelism amounts to simulate how you might run Exq in production. For example, if you are enqueueing from a web tier,
+then your parallelism will be quite high. If you&amp;rsquo;re enqueueing from a single process, you would have no parallelism.&lt;/p&gt;
+
+&lt;p&gt;The redis queues are cleaned up before/after each test. The Exq work processor is not running—this test is purely around
+speed of enqueueing. These tests are all running locally, and Redis is not running through any type of virtualization. The performance
+would be significantly different depending on how redis is setup and the network speed between your application and redis.&lt;/p&gt;
+
+&lt;p&gt;When Benchee was run with a single runner, all of the approaches came out roughly the same. This is expected because we
+won&amp;rsquo;t see parallelism benefits without multiple processes trying to enqueue.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Name                       ips        average  deviation         median         99th %
+named enqueuer          9.05 K      110.52 μs    ±42.61%          99 μs         210 μs
+poolboy enqueuer        8.73 K      114.51 μs    ±57.05%         102 μs         240 μs
+default enqueuer        8.30 K      120.54 μs    ±51.87%         110 μs         249 μs
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The difference with 6 parallel testers was quite different. We can see that the pool approaches have significantly higher
+throughput:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;total ips is these numbers * 6
+Name                       ips        average  deviation         median         99th %
+poolboy enqueuer        4.40 K      227.14 μs    ±39.15%         216 μs         417 μs
+named enqueuer          3.95 K      253.41 μs    ±45.96%         227 μs         605 μs
+default enqueuer        1.05 K      954.02 μs    ±21.91%         951 μs     1446.13 μs
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now for 12:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;total ips is these numbers * 12
+Name                       ips        average  deviation         median         99th %
+poolboy enqueuer        2.83 K      352.86 μs    ±26.97%         339 μs         655 μs
+named enqueuer          2.78 K      359.24 μs    ±53.25%         302 μs        1004 μs
+default enqueuer        0.84 K     1187.04 μs    ±21.96%        1121 μs     1882.19 μs
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;and 24:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;total ips is these numbers * 24
+Name                       ips        average  deviation         median         99th %
+named enqueuer          1.48 K      675.58 μs    ±66.26%      541.98 μs     2198.98 μs
+poolboy enqueuer        1.06 K      942.92 μs    ±51.20%      845.98 μs     2470.98 μs
+default enqueuer        0.34 K     2900.89 μs    ±19.05%     2765.98 μs     4482.25 μs
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;That one surprised me because the named enqueuer was significantly more performant. I tried it over 10 times and
+consistently got the same results. The tests were run in different order each time.&lt;/p&gt;
+
+&lt;p&gt;That disappeared for 48:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;total ips is these numbers * 48
+Name                       ips        average  deviation         median         99th %
+poolboy enqueuer        912.30        1.10 ms    ±30.56%        1.01 ms        2.35 ms
+named enqueuer          896.40        1.12 ms    ±77.47%        0.86 ms        4.06 ms
+default enqueuer        203.05        4.92 ms    ±18.66%        4.65 ms        8.84 ms
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2&gt;Interpreting the Results&lt;/h2&gt;
+
+&lt;p&gt;These results show, clearly, that pooling the &lt;code&gt;Exq.Enqueuer&lt;/code&gt; process significantly increases throughput. This might be
+even more pronounced when Redis is accessed over the network.&lt;/p&gt;
+
+&lt;p&gt;Each test increased the parallelism, and the gap between pooled and single got even larger. With 48 processes enqueueing jobs, the total
+throughput per second is ~43,000 versus ~9,600. With 12 processes enqueueing jobs, the throughput per second is still ~33,000 versus
+~10,000.&lt;/p&gt;
+
+&lt;h2&gt;Action the Results&lt;/h2&gt;
+
+&lt;p&gt;If you are using Exq in production, consider pooling the enqueuer processes to increase throughput capacity. You may also increase
+your enqueue speeds even if you&amp;rsquo;re not at capacity. You can use any pooling approach you want, they are roughly the same and
+have a substantial impact to throughput.&lt;/p&gt;
+
+&lt;p&gt;Exq already has an open issue to discuss adding some type of parallelism to the enqueuer process. Thanks to my colleague Marco for
+opening that issue and for letting me look at this problem with him.&lt;/p&gt;
+
+&lt;h2&gt;The Book Plug&lt;/h2&gt;
+
+&lt;p&gt;My book &amp;ldquo;Real-Time Phoenix: Build Highly Scalable Systems with Channels&amp;rdquo; is now in beta
+through &lt;a href="http://bit.ly/rtp-exq" target="_blank"&gt;The Pragmatic Bookshelf&lt;/a&gt;. This book explores using Phoenix Channels, GenStage, and more to build
+real-time applications in Elixir.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;a href="http://bit.ly/rtp-exq" target="_blank"&gt;
+    &lt;img src="/images/sbsockets.jpg" alt="Real-Time Phoenix by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" /&gt;
+  &lt;/a&gt;
+&lt;/div&gt;
+</content>
+  </entry>
+  <entry>
     <title>Lessons Learned from Shipping PushEx</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/08/30/lessons-learned-from-shipping-pushex.html"/>
     <id>https://stephenbussey.com/2019/08/30/lessons-learned-from-shipping-pushex.html</id>
-    <published>2019-08-30T17:55:00-06:00</published>
-    <updated>2019-08-30T19:46:28-06:00</updated>
+    <published>2019-08-30T19:55:00-04:00</published>
+    <updated>2019-08-30T21:46:28-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -143,8 +392,8 @@ we face when building real-time applications in Elixir.&lt;/p&gt;
     <title>Elixir Makes Testing Hard Things Easy</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/06/08/elixir-makes-testing-hard-things-easy.html"/>
     <id>https://stephenbussey.com/2019/06/08/elixir-makes-testing-hard-things-easy.html</id>
-    <published>2019-06-07T23:59:00-06:00</published>
-    <updated>2019-07-02T11:07:46-06:00</updated>
+    <published>2019-06-08T01:59:00-04:00</published>
+    <updated>2019-07-02T13:07:46-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -291,8 +540,8 @@ decent scale on several pieces of our SaaS app. Come check it out!&lt;/p&gt;
     <title>Useful Elixir Patterns from Real-world Side Project</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/05/10/useful-elixir-patterns-from-real-world-side-project.html"/>
     <id>https://stephenbussey.com/2019/05/10/useful-elixir-patterns-from-real-world-side-project.html</id>
-    <published>2019-05-10T11:00:00-06:00</published>
-    <updated>2019-07-02T11:07:45-06:00</updated>
+    <published>2019-05-10T13:00:00-04:00</published>
+    <updated>2019-07-02T13:07:45-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -427,8 +676,8 @@ soon.&lt;/p&gt;
     <title>Monolith to Microservice Without Downtime — A Production Story</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/03/01/monolith-to-microservice-without-downtime-a-production-story.html"/>
     <id>https://stephenbussey.com/2019/03/01/monolith-to-microservice-without-downtime-a-production-story.html</id>
-    <published>2019-03-01T15:35:00-07:00</published>
-    <updated>2019-07-02T11:07:45-06:00</updated>
+    <published>2019-03-01T17:35:00-05:00</published>
+    <updated>2019-07-02T13:07:45-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -449,8 +698,8 @@ soon.&lt;/p&gt;
     <title>Distributed In-Memory Caching in Elixir</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html"/>
     <id>https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html</id>
-    <published>2019-01-29T15:04:00-07:00</published>
-    <updated>2019-07-02T11:07:46-06:00</updated>
+    <published>2019-01-29T17:04:00-05:00</published>
+    <updated>2019-07-02T13:07:46-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -615,52 +864,6 @@ easy to get caught up in the libraries that we&amp;rsquo;re hearing about rather
 
 &lt;p&gt;Thanks for reading! I&amp;rsquo;ll be speaking at &lt;a href="https://lonestarelixir.com/2019/" target="_blank"&gt;Lonestar ElixirConf&lt;/a&gt; about bringing Elixir to production,
 looking at both human and tech challenges in doing so.&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Understanding Compile Time Dependencies in Elixir - A Bug Hunt</title>
-    <link rel="alternate" href="https://stephenbussey.com/2019/01/03/understanding-compile-time-dependencies-in-elixir-a-bug-hunt.html"/>
-    <id>https://stephenbussey.com/2019/01/03/understanding-compile-time-dependencies-in-elixir-a-bug-hunt.html</id>
-    <published>2019-01-02T19:59:00-07:00</published>
-    <updated>2019-07-02T11:07:46-06:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;This blog post will cover a fairly trivial but still interesting problem that I encountered at work today. I think it&amp;rsquo;s worth writing about simply because it&amp;rsquo;s a bit non-obvious and will probably happen to other people as well. It also is a good time to reinforce our understanding of how the Elixir compiler works and why the order of things matters.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;The issue started after upgrading one of our repositories to the latest Elixir version (from 1.6) and upgrading Distillery from 1.5 -&amp;gt; 2.0. The problem manifested itself as our instrumentation disappearing in DataDog. The graphs was there before the deployment, then immediately became empty after.&lt;/p&gt;
-
-&lt;p&gt;The immediate thought is that something could have been wrong with 1.7 or the upgrade libraries (and not something we did). However, this seems unlikely given that Elixir 1.7 has been out in the wild for a while now and has had time to get any kinks worked out (and something this major would be unlikely anyways). We power our instrumentation with &lt;a href="https://github.com/discordapp/instruments/" target="_blank"&gt;Instruments&lt;/a&gt; as seen in a &lt;a href="/2018/09/24/elixir-probes-replacing-elixometer.html" target="_blank"&gt;past post&lt;/a&gt; and so we verified that the application was started and configured with all of our probes&amp;hellip;everything was visibly okay on this front.&lt;/p&gt;
-
-&lt;p&gt;After confirming that instruments should be working, we noticed that DataDog was reporting some stats for our application that looked an awful lot like what we wanted&amp;hellip;it was just missing our &amp;ldquo;.probes&amp;rdquo; namespace. The problem isn&amp;rsquo;t that the stats weren&amp;rsquo;t reporting, but that they were reporting without our &lt;code&gt;probe_prefix&lt;/code&gt;.&lt;/p&gt;
-
-&lt;h2&gt;The Code Problem&lt;/h2&gt;
-
-&lt;p&gt;Inside of Instruments, there is a line of code which loads the provided probe prefix and places it into a module attribute:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code&gt;# https://github.com/discordapp/instruments/blob/89a620d181ba4a04ed0ac01c47057c018d645428/lib/probe/definitions.ex#L11
-@probe_prefix Application.get_env(:instruments, :probe_prefix)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;This line of code happens inside of a &lt;code&gt;defmodule&lt;/code&gt;, which means that it is read from at compile time and not at run-time. It would be possible to use &lt;code&gt;Application.get_env/2&lt;/code&gt; at run-time using something like &lt;code&gt;def probe_prefix&lt;/code&gt;, but there is nothing wrong with the module attribute approach.&lt;/p&gt;
-
-&lt;p&gt;In Distillery 1, all config was provided at compile time and &lt;code&gt;probe_prefix&lt;/code&gt; would always be present. In Distillery 2 (with the awesome new config providers), config can optionally be provided at run time; this simplifies and fixes quite a few deployment quirks. Our standard for Distillery 2 config providers has been to move &lt;code&gt;config/prod.exs&lt;/code&gt; to &lt;code&gt;rel/config/runtime.exs&lt;/code&gt;.&lt;/p&gt;
-
-&lt;h2&gt;The Fix&lt;/h2&gt;
-
-&lt;p&gt;In hindsight, we should not have moved the entire contents of &lt;code&gt;config/prod.exs&lt;/code&gt; into our config provider. As Paul mentions in his &lt;a href="https://dockyard.com/blog/2018/08/23/announcing-distillery-2-0" target="_blank"&gt;release blog post&lt;/a&gt;, &amp;ldquo;You can still use all of the config files under config/ in your project, but you should use those for compile-time config and default values only&amp;rdquo;.&lt;/p&gt;
-
-&lt;p&gt;The fix is as simple as making sure our &lt;code&gt;runtime.exs&lt;/code&gt; file only has dynamic values in it. This means that we provide a &lt;code&gt;config/prod.exs&lt;/code&gt; file for static configuration, and a &lt;code&gt;rel/config/runtime.exs&lt;/code&gt; file for dynamic configuration.&lt;/p&gt;
-
-&lt;h2&gt;Compilation vs Run-time&lt;/h2&gt;
-
-&lt;p&gt;The reason that I liked this small bug is that it reinforces understanding of compilation and how we can very quickly end up blurring the line between run-time and compile-time. As users and authors of code, we have to be cognizant of where are values are coming from and where provided values are going. It often will be perfectly &amp;ldquo;okay&amp;rdquo; to do things incorrectly (because there are many situations where it wouldn&amp;rsquo;t be a problem), but it can be difficult to track down when it is not okay. In particular, this issue looked like &lt;code&gt;probe_prefix&lt;/code&gt; was setup correctly, and only become clear through reading of the source code that it was not setup correctly.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;Thanks for reading! I&amp;rsquo;ll be speaking at &lt;a href="https://lonestarelixir.com/2019/" target="_blank"&gt;Lonestar ElixirConf&lt;/a&gt; about bringing Elixir to production, looking at both human and tech challenges in doing so.&lt;/p&gt;
 </content>
   </entry>
 </feed>

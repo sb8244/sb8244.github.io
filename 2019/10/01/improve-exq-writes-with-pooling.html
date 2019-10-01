@@ -1,0 +1,333 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Improve ExQ Writes With Pooling</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-62190780.css" rel="stylesheet" />
+    <link href="/styles/atom-one-light-eda63d8c.css" rel="stylesheet" />
+    <script src="/js/highlight.min-105fddac.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </header>
+
+      <h1>Improve ExQ Writes With Pooling</h1>
+      <p><a href="https://hex.pm/packages/exq" target="_blank">Exq</a> is a background job processing library written in Elixir. It uses Redis, via the
+Redix library, to store and then retrieve jobs. In this post, we&rsquo;ll look at the performance of writing jobs into Redis
+via the <code>Exq.Enqueuer</code> API. You&rsquo;ll see several benchmarks that utilize a single <code>Enqueuer</code>, a poolboy queue, and a named
+process pool.</p>
+
+<p>The repo for the benchmark and sample application is at <a href="https://github.com/sb8244/exq-throughput" target="_blank">https://github.com/sb8244/exq-throughput</a>.</p>
+
+<h2>The Problem</h2>
+
+<p>Background job processing libraries write their jobs into a persistent storage mechanism and then retrieve those jobs
+in the future. If you&rsquo;ve used Ruby, you may be familiar with Sidekiq. The act of writing to Redis is very fast, but there
+can be overhead at multiple levels. If the overhead is too high, then writing jobs to Redis becomes slow and the application
+may become backed up. This can lead to errors or even a loss of service, if acknowledged persistence of a job is required.</p>
+
+<h2>Types of Overhead</h2>
+
+<p>The most common overhead that I&rsquo;ve seen is the backup of Redis commands being executed end-to-end serially. This happens
+when you use a single connection to write to Redis, and can occur in any language. The issue arises because a single connection can only
+send one command at a time. It must then wait for the response before another command can occur. Redis is single-threaded, so it may not
+be obvious why this is an issue. The problem is that the network overhead is done serially in this type of system—each write has to
+go over the network and back before the next starts.</p>
+
+<p>The following diagram shows the speed of three hypothetical Redis requests:</p>
+
+<div style="text-align: center">
+  <img src="/images/ExqPool/redis_serialization.svg"
+       alt="Redis single connection versus pooled connection. Pooled connection completes 3 requests much faster."
+       height="375px" />
+  <p>
+    <small><i>Redis single connection versus pooled connection. Pooled connection completes 3 requests much faster.</i></small>
+  </p>
+</div>
+
+<p>Each connection sends a command that goes over the network to Redis, which processes the command. A response is returned
+and also goes over the network. In the real-world, this network latency might be 1ms or less. However, the end result is that
+the requests complete much faster when multiple commands can be simultaneously sent via multiple connections.</p>
+
+<p>Another type of overhead is the fact that an Elixir process handles messages serially. If a job is enqueued via a single
+process, the same problem as a single connection emerges.</p>
+
+<h2>The Problem in Exq</h2>
+
+<p>Exq enqueues jobs through the <code>Exq.Enqueuer</code> process. This is a single process that holds a single redis connection. Each enqueue
+task goes through this one process, serially. If serial processes and single connections lead to less throughput, then this is
+will limit the throughput of Exq enqueueing.</p>
+
+<p>Let&rsquo;s move into what we can do about it, and then benchmarks.</p>
+
+<h2>Pool Processes to Increase Throughput</h2>
+
+<p>The solution to the problem above is to pool processes, so that multiple Redis commands can be sent to Redis in the same moment
+of time. There are two main ways that I&rsquo;ve done this in Elixir: poolboy and named pools.</p>
+
+<h4>Poolboy</h4>
+
+<p><a href="https://github.com/devinus/poolboy" target="_blank">Poolboy</a> is a nifty Erlang library that can create a pool of any process you want. We could
+pool <code>Exq.Enqueuer</code> processes and then enqueue jobs by using the poolboy functions. Let&rsquo;s see how we&rsquo;d do that:</p>
+
+<pre><code class="elixir">defmodule ExqThroughput.Application do
+  use Application
+
+  def start(_type, _args) do
+    children =
+      [
+        :poolboy.child_spec(:worker, poolboy_config())
+      ]
+
+    opts = [strategy: :one_for_one, name: ExqThroughput.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+
+  def enqueuer_pool_size(), do: :erlang.system_info(:schedulers_online)
+
+  def poolboy_config() do
+    [
+      {:name, {:local, :enqueuer}},
+      {:worker_module, ExqThroughput.PooledEnqueuer},
+      {:size, enqueuer_pool_size()}
+    ]
+  end
+end
+
+defmodule ExqThroughput.PooledEnqueuer do
+  def start_link(_) do
+    # Hack to make Exq happy with running
+    num = :rand.uniform(100_000_000) + 100
+    name = :&quot;Elixir.Exq#{num}&quot;
+    Exq.Enqueuer.start_link(name: name)
+
+    # We need to put the enqueuer instance into the pool
+    {:ok, Process.whereis(:&quot;#{name}.Enqueuer&quot;)}
+  end
+end
+</code></pre>
+
+<p>There is a bit of a hack in the <code>PooledEnqueuer</code> module to make Exq happy. There may be another way to get around this, but I went
+for a quick solution for the purpose of this benchmark. There is also a bit of working around the Exq process tree to get access
+directly to the Enqueuer process.</p>
+
+<p>We can now enqueue a job by first checking out the poolboy process:</p>
+
+<pre><code class="elixir">:poolboy.transaction(:enqueuer, fn pid -&gt;
+  Exq.enqueue(pid, &quot;throughput_queue&quot;, Worker, [])
+end)
+</code></pre>
+
+<p>Named process pooling looks a bit different than this.</p>
+
+<h4>Named Processes</h4>
+
+<p>You can start multiple processes in Elixir and give them a name like <code>MyProcess1</code>, <code>MyProcess2</code>, etc. When you want to send a
+message to the process, you would send a message to <code>:&quot;Elixir.MyProcess#{:rand.uniform(2)}&quot;</code>. This is named process pooling, and is
+conceptually very simple—this makes it easier to setup.</p>
+
+<p>We have to start the pool of processes in the application:</p>
+
+<pre><code class="elixir">defmodule ExqThroughput.Application do
+  use Application
+
+  def start(_type, _args) do
+    children = named_enqueuer_pool(enqueuer_pool_size())
+    opts = [strategy: :one_for_one, name: ExqThroughput.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+
+  def enqueuer_pool_size(), do: :erlang.system_info(:schedulers_online)
+
+  defp named_enqueuer_pool(count) do
+    for i &lt;- 1..count do
+      name = :&quot;Elixir.Exq#{i}&quot;
+
+      %{
+        id: name,
+        start: {Exq.Enqueuer, :start_link, [[name: name]]}
+      }
+    end
+  end
+end
+</code></pre>
+
+<p>We can then enqueue work by directly using these processes:</p>
+
+<pre><code class="elixir">def named_enqueue() do
+  num = :rand.uniform(ExqThroughput.Application.enqueuer_pool_size())
+  Exq.enqueue(:&quot;Elixir.Exq#{num}.Enqueuer&quot;, &quot;throughput_queue&quot;, Worker, [])
+end
+</code></pre>
+
+<p>I love this approach due to its simplicity. Let&rsquo;s see how all of the approaches stack up.</p>
+
+<h2>Benchmark</h2>
+
+<p>Benchee is used to benchmark three scenarios: single process, poolboy, named processes. Benchee is ran with various
+parallelism amounts to simulate how you might run Exq in production. For example, if you are enqueueing from a web tier,
+then your parallelism will be quite high. If you&rsquo;re enqueueing from a single process, you would have no parallelism.</p>
+
+<p>The redis queues are cleaned up before/after each test. The Exq work processor is not running—this test is purely around
+speed of enqueueing. These tests are all running locally, and Redis is not running through any type of virtualization. The performance
+would be significantly different depending on how redis is setup and the network speed between your application and redis.</p>
+
+<p>When Benchee was run with a single runner, all of the approaches came out roughly the same. This is expected because we
+won&rsquo;t see parallelism benefits without multiple processes trying to enqueue.</p>
+
+<pre><code>Name                       ips        average  deviation         median         99th %
+named enqueuer          9.05 K      110.52 μs    ±42.61%          99 μs         210 μs
+poolboy enqueuer        8.73 K      114.51 μs    ±57.05%         102 μs         240 μs
+default enqueuer        8.30 K      120.54 μs    ±51.87%         110 μs         249 μs
+</code></pre>
+
+<p>The difference with 6 parallel testers was quite different. We can see that the pool approaches have significantly higher
+throughput:</p>
+
+<pre><code>total ips is these numbers * 6
+Name                       ips        average  deviation         median         99th %
+poolboy enqueuer        4.40 K      227.14 μs    ±39.15%         216 μs         417 μs
+named enqueuer          3.95 K      253.41 μs    ±45.96%         227 μs         605 μs
+default enqueuer        1.05 K      954.02 μs    ±21.91%         951 μs     1446.13 μs
+</code></pre>
+
+<p>Now for 12:</p>
+
+<pre><code>total ips is these numbers * 12
+Name                       ips        average  deviation         median         99th %
+poolboy enqueuer        2.83 K      352.86 μs    ±26.97%         339 μs         655 μs
+named enqueuer          2.78 K      359.24 μs    ±53.25%         302 μs        1004 μs
+default enqueuer        0.84 K     1187.04 μs    ±21.96%        1121 μs     1882.19 μs
+</code></pre>
+
+<p>and 24:</p>
+
+<pre><code>total ips is these numbers * 24
+Name                       ips        average  deviation         median         99th %
+named enqueuer          1.48 K      675.58 μs    ±66.26%      541.98 μs     2198.98 μs
+poolboy enqueuer        1.06 K      942.92 μs    ±51.20%      845.98 μs     2470.98 μs
+default enqueuer        0.34 K     2900.89 μs    ±19.05%     2765.98 μs     4482.25 μs
+</code></pre>
+
+<p>That one surprised me because the named enqueuer was significantly more performant. I tried it over 10 times and
+consistently got the same results. The tests were run in different order each time.</p>
+
+<p>That disappeared for 48:</p>
+
+<pre><code>total ips is these numbers * 48
+Name                       ips        average  deviation         median         99th %
+poolboy enqueuer        912.30        1.10 ms    ±30.56%        1.01 ms        2.35 ms
+named enqueuer          896.40        1.12 ms    ±77.47%        0.86 ms        4.06 ms
+default enqueuer        203.05        4.92 ms    ±18.66%        4.65 ms        8.84 ms
+</code></pre>
+
+<h2>Interpreting the Results</h2>
+
+<p>These results show, clearly, that pooling the <code>Exq.Enqueuer</code> process significantly increases throughput. This might be
+even more pronounced when Redis is accessed over the network.</p>
+
+<p>Each test increased the parallelism, and the gap between pooled and single got even larger. With 48 processes enqueueing jobs, the total
+throughput per second is ~43,000 versus ~9,600. With 12 processes enqueueing jobs, the throughput per second is still ~33,000 versus
+~10,000.</p>
+
+<h2>Action the Results</h2>
+
+<p>If you are using Exq in production, consider pooling the enqueuer processes to increase throughput capacity. You may also increase
+your enqueue speeds even if you&rsquo;re not at capacity. You can use any pooling approach you want, they are roughly the same and
+have a substantial impact to throughput.</p>
+
+<p>Exq already has an open issue to discuss adding some type of parallelism to the enqueuer process. Thanks to my colleague Marco for
+opening that issue and for letting me look at this problem with him.</p>
+
+<h2>The Book Plug</h2>
+
+<p>My book &ldquo;Real-Time Phoenix: Build Highly Scalable Systems with Channels&rdquo; is now in beta
+through <a href="http://bit.ly/rtp-exq" target="_blank">The Pragmatic Bookshelf</a>. This book explores using Phoenix Channels, GenStage, and more to build
+real-time applications in Elixir.</p>
+
+<div style="text-align: center">
+  <a href="http://bit.ly/rtp-exq" target="_blank">
+    <img src="/images/sbsockets.jpg" alt="Real-Time Phoenix by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" />
+  </a>
+</div>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+
+      <div class="signup-footer">
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>
+      hljs.initHighlightingOnLoad();
+
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+
+      (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+      slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
