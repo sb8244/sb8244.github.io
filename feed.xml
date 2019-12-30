@@ -4,10 +4,230 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2019-10-01T00:26:00-04:00</updated>
+  <updated>2019-12-30T13:28:00-05:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>Verifying Queries with Ecto's prepare_query Callback</title>
+    <link rel="alternate" href="https://stephenbussey.com/2019/12/30/verifying-queries-with-ecto-s-prepare_query.html"/>
+    <id>https://stephenbussey.com/2019/12/30/verifying-queries-with-ecto-s-prepare_query.html</id>
+    <published>2019-12-30T13:28:00-05:00</published>
+    <updated>2019-12-30T14:35:52-05:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;You can use many different techniques to build and scale Software as a Service applications. One technique that is very popular is
+to use a single database for multiple paying customers. This multi-tenant approach to SaaS works well for many people, but there are
+a few dangers to look out for. The biggest danger is the risk of cross-tenant data leaking. I consider this the worst possible scenario
+for a multi-tenant SaaS application, even beyond a full system outage.&lt;/p&gt;
+
+&lt;p&gt;In this post, we&amp;rsquo;re going to look at a technique to guarantee that cross-tenant leaks don&amp;rsquo;t happen in an Elixir application. We&amp;rsquo;ll be
+looking at Ecto&amp;rsquo;s new(ish) &lt;code&gt;prepare_query&lt;/code&gt; callback and how it can be used to inspect (almost) every query that goes through your
+application. I&amp;rsquo;ll discuss how I test drove a query inspector to inspect every query for tenancy.&lt;/p&gt;
+
+&lt;p&gt;The ultimate goal of this post is to serve as a light reference for how I navigated the &lt;code&gt;Ecto.Query&lt;/code&gt; struct to implement
+the tenancy enforcer. The biggest challenge that I faced was understanding what went into the structure and how to walk it.&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s first look at what &lt;code&gt;prepare_query&lt;/code&gt; is.&lt;/p&gt;
+
+&lt;h2&gt;Ecto&amp;rsquo;s &lt;code&gt;prepare_query&lt;/code&gt; Callback&lt;/h2&gt;
+
+&lt;p&gt;The &lt;a href="https://hexdocs.pm/ecto/Ecto.Repo.html#c:prepare_query/3" target="_blank"&gt;&lt;code&gt;prepare_query&lt;/code&gt;&lt;/a&gt; callback was introduced in September of 2019. You
+can define a function (&lt;code&gt;prepare_query&lt;/code&gt;) in your &lt;code&gt;Application.Repo&lt;/code&gt; module. The function is invoked before a query is executed, and you
+are provided the full query structure as well as some metadata.&lt;/p&gt;
+
+&lt;p&gt;With &lt;code&gt;prepare_query&lt;/code&gt;, you can inspect the query or even modify it. The Ecto documentation gives an example where a Repo filters out
+&amp;ldquo;soft deleted&amp;rdquo; records unless the user is an admin. It looks like this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;# From https://hexdocs.pm/ecto/Ecto.Repo.html#c:prepare_query/3
+
+@impl true
+def prepare_query(_operation, query, opts) do
+  if opts[:admin] do
+    {query, opts}
+  else
+    query = from(x in query, where: is_nil(x.deleted_at))
+    {query, opts}
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;We can use this to detect whether a query has tenancy set correctly. We won&amp;rsquo;t actually modify the query in this post, due to
+concerns I have with how that approach removes multi-tenancy awareness.&lt;/p&gt;
+
+&lt;p&gt;In order to get started, we&amp;rsquo;ll need to define a function that shows us the &lt;code&gt;Ecto.Query&lt;/code&gt; structure. Let&amp;rsquo;s do that next.&lt;/p&gt;
+
+&lt;h2&gt;Understanding Ecto Query Structure from Inspect Protocol&lt;/h2&gt;
+
+&lt;p&gt;In order to get started with a runnable example, I modified
+&lt;a href="https://github.com/sb8244/ecto_tenancy_enforcer/blob/master/test/support/tenancy/repo.ex" target="_blank"&gt;&lt;code&gt;test/support/tenancy/repo.ex&lt;/code&gt;&lt;/a&gt;
+by replacing &lt;code&gt;prepare_query&lt;/code&gt; with the following empty function.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;  def prepare_query(_operation, query, opts) do
+    IO.inspect query
+    {query, opts}
+  end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;I can then run the test &lt;code&gt;&amp;quot;valid tenancy is only condition&amp;quot;&lt;/code&gt; with &lt;code&gt;mix test test/integration/prepare_test.exs:26&lt;/code&gt;, and see the following
+output:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;➜  ecto_tenancy_enforcer git:(master) ✗ mix test test/integration/prepare_test.exs:26
+#Ecto.Query&amp;lt;from s0 in &amp;quot;schema_migrations&amp;quot;, lock: &amp;quot;FOR UPDATE&amp;quot;,
+ select: type(s0.version, :integer)&amp;gt;
+Including tags: [line: &amp;quot;26&amp;quot;]
+Excluding tags: [:test]
+
+#Ecto.Query&amp;lt;from c0 in Tenancy.Company, where: c0.tenant_id == 1, select: c0&amp;gt;
+.
+
+Finished in 0.2 seconds
+43 tests, 0 failures, 42 excluded
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;That&amp;rsquo;s not quite helpful, because the &lt;code&gt;Ecto.Query&lt;/code&gt; is printed out in text form. We can add &lt;code&gt;structs: false&lt;/code&gt; to the &lt;code&gt;IO.inspect&lt;/code&gt; call
+and we get a different result.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;%{
+  __struct__: Ecto.Query,
+  aliases: %{},
+  assocs: [],
+  combinations: [],
+  distinct: nil,
+  from: %{
+    __struct__: Ecto.Query.FromExpr,
+    as: nil,
+    hints: [],
+    prefix: nil,
+    source: {&amp;quot;companies&amp;quot;, Tenancy.Company}
+  },
+  group_bys: [],
+  havings: [],
+  joins: [],
+  limit: nil,
+  lock: nil,
+  offset: nil,
+  order_bys: [],
+  prefix: nil,
+  preloads: [],
+  select: %{
+    __struct__: Ecto.Query.SelectExpr,
+    expr: {:&amp;amp;, [], [0]},
+    fields: nil,
+    file: &amp;quot;/Users/stephenbussey/src/ecto_tenancy_enforcer/deps/ecto/lib/ecto/query/planner.ex&amp;quot;,
+    line: 814,
+    params: [],
+    take: %{}
+  },
+  sources: nil,
+  updates: [],
+  wheres: [
+    %{
+      __struct__: Ecto.Query.BooleanExpr,
+      expr: {:==, [],
+       [
+         {{:., [], [{:&amp;amp;, [], [0]}, :tenant_id]}, [], []},
+         %{
+           __struct__: Ecto.Query.Tagged,
+           tag: nil,
+           type: {0, :tenant_id},
+           value: 1
+         }
+       ]},
+      file: &amp;quot;/Users/stephenbussey/src/ecto_tenancy_enforcer/test/integration/prepare_test.exs&amp;quot;,
+      line: 27,
+      op: :and,
+      params: []
+    }
+  ],
+  windows: [],
+  with_ctes: nil
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Alright, now we have the actual struct that we can work with. We are capable of writing a query, inspecting the struct, and then figuring
+out how to walk / enforce that query. If we continued with TDD at this point, we&amp;rsquo;d eventually hit a snag. &lt;code&gt;Ecto.Query&lt;/code&gt; represents
+referenced tables (joins, some wheres) with a positional index system. However, the structure doesn&amp;rsquo;t include
+the list of positional references&amp;mdash;you have to build it yourself.&lt;/p&gt;
+
+&lt;p&gt;This led to a bit of a pickle, because it&amp;rsquo;s not documented anywhere and is considered an internal query structure. However, we know
+of at least one place that knows how to resolve a positional index into a table / module name (Ecto.Query inspect). Let&amp;rsquo;s find that
+and see what it&amp;rsquo;s doing.&lt;/p&gt;
+
+&lt;p&gt;A search for &lt;code&gt;defimpl&lt;/code&gt; in Ecto brings us to &lt;a href="https://github.com/elixir-ecto/ecto/blob/b3ee240e91deecfd6d8727946bfc8ed5de752e4f/lib/ecto/query/inspect.ex#L21" target="_blank"&gt;this line&lt;/a&gt;,
+which is the implementation of &lt;code&gt;Inspect&lt;/code&gt; for &lt;code&gt;Ecto.Query&lt;/code&gt;. In particular, the following code is of interest to us:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;  defp to_list(query) do
+    names =
+      query
+      |&amp;gt; collect_sources
+      |&amp;gt; generate_letters
+      |&amp;gt; generate_names
+      |&amp;gt; List.to_tuple()
+
+    ...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;With this lead, it&amp;rsquo;s possible to use these same functions to create a positional index lookup. You can see a finished example of this
+in &lt;a href="https://github.com/sb8244/ecto_tenancy_enforcer/blob/master/lib/ecto_tenancy_enforcer/source_collector.ex" target="_blank"&gt;&lt;code&gt;EctoTenancyEnforcer.SourceCollector&lt;/code&gt;&lt;/a&gt;. I modified this to return the schema module name, rather than a letter or table name, so that I could use my
+&lt;code&gt;enforced_schemas&lt;/code&gt; option to check if a referenced table needs checked or not.&lt;/p&gt;
+
+&lt;p&gt;We have about as much as we&amp;rsquo;re going to get out of Ecto. At this point, it&amp;rsquo;s possible to jump in and start coding a query verifier to
+do whatever you want. I found myself still a bit lost at this point, but I did know what I wanted to pass / fail. I&amp;rsquo;ll walk through
+the steps I took to test drive a query enforcer.&lt;/p&gt;
+
+&lt;h2&gt;Test Driving EctoTenancyEnforcer&lt;/h2&gt;
+
+&lt;p&gt;I don&amp;rsquo;t practice test driven development often, but I find it valuable when I have no clue what the solution is going to be, but I
+know what I want it to look like. That is the case in a query enforcer, because it&amp;rsquo;s easy to write out queries that should pass and
+fail into a test suite. I can then go one-by-one to make the incorrect ones fail, while still having the valid ones pass.&lt;/p&gt;
+
+&lt;p&gt;I started with a set of very simple tests, like so:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class="elixir"&gt;test &amp;quot;no filters at all&amp;quot; do
+  assert_raise(TenancyViolation, fn -&amp;gt;
+    Repo.all(Company)
+  end)
+end
+
+test &amp;quot;valid tenancy is only condition&amp;quot; do
+  valid = from c in Company, where: c.tenant_id == 1
+  assert Repo.all(valid) |&amp;gt; length == 1
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;I started with these to build some simple confidence. Once they were passing, I listed out about 40 queries that I knew should work
+or not work. I chipped my way through these and eventually found the patterns in the &lt;code&gt;Ecto.Query&lt;/code&gt; struct that led to fairly clean code to
+walk them.&lt;/p&gt;
+
+&lt;p&gt;The final result can be seen in the &lt;a href="https://github.com/sb8244/ecto_tenancy_enforcer/blob/master/lib/ecto_tenancy_enforcer/query_verifier.ex" target="_blank"&gt;&lt;code&gt;EctoTenancyEnforcer.QueryVerifier&lt;/code&gt;&lt;/a&gt; module. I&amp;rsquo;m sure that there are cases I missed in my TDD, but I&amp;rsquo;m happy enough with this to
+use it in production applications. I&amp;rsquo;ll add new tests as cases are encountered in the wild.&lt;/p&gt;
+
+&lt;h2&gt;Wrapping Up&lt;/h2&gt;
+
+&lt;p&gt;Ecto&amp;rsquo;s &lt;code&gt;prepare_query&lt;/code&gt; callback is incredibly powerful for query inspection and modification. It&amp;rsquo;s a bit dense to get started with,
+due to the &lt;code&gt;Ecto.Query&lt;/code&gt; structure being undocumented, but TDD helped me out significantly. The &lt;code&gt;Ecto.Query&lt;/code&gt; walking is undocumented,
+but I&amp;rsquo;m anticipating stability in the Query structure going into the future. That may or may not pan out, but I think it&amp;rsquo;s a decent
+bet.&lt;/p&gt;
+
+&lt;p&gt;If you&amp;rsquo;re looking for tenancy enforcement in Ecto queries, try out &lt;a href="https://github.com/sb8244/ecto_tenancy_enforcer" target="_blank"&gt;EctoTenancyEnforcer&lt;/a&gt;.
+You can refer to this repo as a complete example of query enforcement.&lt;/p&gt;
+
+&lt;h2&gt;The Book Plug&lt;/h2&gt;
+
+&lt;p&gt;My book &amp;ldquo;Real-Time Phoenix: Build Highly Scalable Systems with Channels&amp;rdquo; is now in beta
+through &lt;a href="http://bit.ly/rtp-exq" target="_blank"&gt;The Pragmatic Bookshelf&lt;/a&gt;. This book explores using Phoenix Channels, GenStage, and more to build
+real-time applications in Elixir. The first draft has been completed for a little bit and the book should be in production by
+February, with print coming at the end of the production process.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;a href="http://bit.ly/rtp-ecto-tenancy" target="_blank"&gt;
+    &lt;img src="/images/sbsockets.jpg" alt="Real-Time Phoenix by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" /&gt;
+  &lt;/a&gt;
+&lt;/div&gt;
+</content>
+  </entry>
   <entry>
     <title>Improve Exq Writes With Pooling</title>
     <link rel="alternate" href="https://stephenbussey.com/2019/10/01/improve-exq-writes-with-pooling.html"/>
@@ -692,178 +912,6 @@ soon.&lt;/p&gt;
 &lt;li&gt;The timeline was significantly longer than I anticipated. This is important because we have to prioritize refactoring old code against developing new features and fixing bugs. On the flip side…&lt;/li&gt;
 &lt;li&gt;The slower timeline helped us ensure rock solid stability. We had zero stability concern on release day, which turned out to be like any other normal day.&lt;/li&gt;
 &lt;/ul&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Distributed In-Memory Caching in Elixir</title>
-    <link rel="alternate" href="https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html"/>
-    <id>https://stephenbussey.com/2019/01/29/distributed-in-memory-caching-in-elixir.html</id>
-    <published>2019-01-29T17:04:00-05:00</published>
-    <updated>2019-07-02T13:07:46-04:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I&amp;rsquo;ve been working with implementing our PushEx server at SalesLoft (a bit later than I thought I&amp;rsquo;d have time to) and one
-of the challenges has been to map user identities in our authentication token to a legacy identity that we use in our
-push channels. This is as simple as an HTTP call, but it is also something that could potentially burst very hard and cause
-a large number of downstream HTTP calls. In order to help alleviate this, the identity -&amp;gt; secondary identity will be cached.&lt;/p&gt;
-
-&lt;p&gt;I would typically just throw a cache in redis or memcached, but I really wanted to reach for something simpler in this situation.
-My goals for this project are:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;No external databases introduced (there are none currently on our PushEx implementation)&lt;/li&gt;
-&lt;li&gt;Caching can be persistent between deploys (we roll our deploys so some pods are always online)&lt;/li&gt;
-&lt;li&gt;Caching is conceptually simple in case it needs debugged by another engineer in the future&lt;/li&gt;
-&lt;li&gt;Identity mappings will be stable between services, so time variations are not required. However:&lt;/li&gt;
-&lt;li&gt;Caching will use a TTL to prevent really stale values from being used&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;I&amp;rsquo;m going to walk through the different options I looked at and what I ended up on. The options I passed on aren&amp;rsquo;t necessarily bad,
-they just ended up being operationally or conceptually more difficult than I needed.&lt;/p&gt;
-
-&lt;h1&gt;Swarm&lt;/h1&gt;
-
-&lt;p&gt;There was a great talk in the Atlanta Elixir Meetup recently about using Swarm to manage processes across a cluster. I really liked
-a few things that the presentation demonstrated:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;Processes are stable such that restarting a node with the same identity will put the process back on that node&lt;/li&gt;
-&lt;li&gt;Processes are capable of handing themselves off to another node&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;My initial plan was to put Cachex or another store in sharded processes that are distributed across the cluster. However, I soon
-realized that passing off this ets state may be fairly complex and so I ended up looking at the cache as a simple in-process memory
-map. That is actually fine with me, but some other things didn&amp;rsquo;t work out for it.&lt;/p&gt;
-
-&lt;p&gt;The biggest issue that I ran into was that process hand-off became fairly complex to implement. I never actually got that working
-properly after ~4 hours of work on it. Another bigger issue is that there is no process state replication. This means that my shard
-values would have to pass themselves off fully to another node between the time that the node is told to shut down and the near future.
-If the node was forcibly killed before then, the data would be lost and the cache would be re-populated.&lt;/p&gt;
-
-&lt;p&gt;I ended up moving on from this to trying out the next solution because it seemed like I was getting myself into a solution I didn&amp;rsquo;t need.
-That will be a theme in this blog post: there is nothing particularly wrong with technology X, but the trade-offs it brings may be more
-than worth it for the particular use case I&amp;rsquo;m working with.&lt;/p&gt;
-
-&lt;h1&gt;Delta CRDT&lt;/h1&gt;
-
-&lt;p&gt;After talking with my colleague Dan about this topic (he will be presenting on distributed state at Lonestar Elixir Conf and it will be awesome),
-he suggested looking at DeltaCRDT as a potential solution. I really liked this library for a few reasons:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;State is replicated across the cluster, so shutdowns are not frantic&lt;/li&gt;
-&lt;li&gt;CRDT gives a lot of benefit around time variation in the cluster (node A has a different value than node B at a point in time)&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;We ended up getting a working solution that used the DeltaCRDT library. Our code looked something like this (don&amp;rsquo;t use this code):&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="elixir"&gt;defmodule SalesloftPusher.AccountLookupCache.Monitor do
-  use GenServer
-
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, [], name: __MODULE__)
-  end
-
-  def init(_) do
-    :net_kernel.monitor_nodes(true)
-
-    {neighbors, []} = :rpc.multicall(Node.list, Process, :whereis, [AccountLookupCache])
-    DeltaCrdt.add_neighbours(AccountLookupCache, neighbors)
-
-    {:ok, []}
-  end
-
-  # Callbacks
-
-  def handle_info({:nodeup, node}, state) do
-    handle_info({:retrynodeup, node, 0}, state)
-  end
-
-  def handle_info({:retrynodeup, node, count}, state) do
-    pid = :rpc.call(node, Process, :whereis, [AccountLookupCache])
-
-    if pid == nil do
-      IO.puts &amp;quot;Node is up, but app not booted, retry = #{count}&amp;quot;
-      Process.send_after(self(), {:retrynodeup, node, count + 1}, 500)
-    else
-      IO.puts &amp;quot;Node is now up #{node} #{inspect(pid)}&amp;quot;
-      DeltaCrdt.add_neighbours(AccountLookupCache, [pid])
-    end
-
-    {:noreply, state}
-  end
-
-  def handle_info({:nodedown, _node}, state) do
-    {:noreply, state}
-  end
-end
-
-usage:
-
-DeltaCrdt.read(AccountLookupCache)
-DeltaCrdt.mutate(AccountLookupCache, :add, [&amp;quot;1111/2&amp;quot;, &amp;quot;4&amp;quot;])
-DeltaCrdt.read(AccountLookupCache)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;This is a pretty slick library and the setup was fairly simple. This code may have some edge cases in it but we ran into
-some performance issues with larger data sets and moved onto another solution. While we did end up moving on from it, the
-author has been working hard on a refactor to improve the speed of the data structure. What&amp;rsquo;s he is doing is way beyond my
-understanding of CRDTs and is pretty inspiring open-source work.&lt;/p&gt;
-
-&lt;p&gt;This issue got me thinking and I realized that I didn&amp;rsquo;t need a lot of the benefits of the CRDT. I wanted replication across
-the cluster, but my values are stable and so time variations won&amp;rsquo;t be a factor. I would most likely have stuck with DeltaCRDT
-at this point if that was a factor, but I ended up moving onto my current solution.&lt;/p&gt;
-
-&lt;h1&gt;Cachex + pg2 Replication&lt;/h1&gt;
-
-&lt;p&gt;My final solution involves a tried and true solution around Cachex + pg2. I&amp;rsquo;ve &lt;a href="/2018/02/17/pg2-basics-use-process-groups-for-orchestration-across-a-cluster.html" target="_blank"&gt;written about pg2&lt;/a&gt;
-in the past and have used it successfully in production on several projects. It essentially lets us
-place our cache processes in a group across the cluster and reference the remote cache processes as a pid list.&lt;/p&gt;
-
-&lt;p&gt;The solution presented below utilizes Cachex for all local set/get/stat, and passes messages containing
-sets to the cluster using &lt;code&gt;send&lt;/code&gt;. When the cache process starts it notifies all neighbors in pg2
-that it would like a dump of the state and then writes that into Cachex. Here are some strengths
-and weaknesses of the solution:&lt;/p&gt;
-
-&lt;ul&gt;
-&lt;li&gt;+ Boot based (rather than shutdown) based replication so that nodes do not lose data when they go down&lt;/li&gt;
-&lt;li&gt;+ Cachex for local cache management (so we get all of that library&amp;rsquo;s benefits)&lt;/li&gt;
-&lt;li&gt;+ Efficient writing and loading of an export. In testing it took less than 3 seconds for a 1,000,000 key cache locally (higher across network)&lt;/li&gt;
-&lt;li&gt;- The entire cluster being down will cause cache data loss and an increase in misses&lt;/li&gt;
-&lt;li&gt;- There is no consensus on what the right cache is, it&amp;rsquo;s best attempt&lt;/li&gt;
-&lt;li&gt;- Possible flood of binary across network on boot with many nodes&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;p&gt;The biggest disadvantage is the last one and I think it will be fixed before I take this code into production. It
-is a purely effort based blocker (I need to write the code) and conceptually will work just fine.&lt;/p&gt;
-
-&lt;h1&gt;The Code&lt;/h1&gt;
-
-&lt;p&gt;The code is on a gist due to being fairly long: &lt;a href="https://gist.github.com/sb8244/371335946d444bd8c5786571cacef4d6" target="_blank"&gt;The Code&lt;/a&gt;&lt;/p&gt;
-
-&lt;p&gt;The end result is a straightforward set/get interface which handles all of the distribution and caching.
-I did a few basic performance tests of the system by throwing 10k, 50k, 500k, 1000k k/v
-pairs into the cache and seeing how it performed. Writes and distribution were incredibly fast and rebooting
-the application caused cache availability within a few seconds, well before the app would finish booting for
-kubernetes health checks. There was one caveat I noticed which is that memory usage spiked while loading
-the dumps from remote servers. I believe that the best solution here will involve me changing to a solution
-that collects the size of each remote cache and selects the top 1 or 2 sized caches. That will prevent N
-servers from sending full cache dumps and only 1 or 2.&lt;/p&gt;
-
-&lt;h1&gt;Summary&lt;/h1&gt;
-
-&lt;p&gt;In summary, three different potential solutions were evaluated for this distributed caching problem. While
-the first two options utilize great libraries and would be possible to build on, the trade-offs were too much
-for the simplicity of my needs.&lt;/p&gt;
-
-&lt;p&gt;When working on a software project like this, considering what your exact needs are is important and may actually
-lead you away from the typical libraries into a different solution. It may seem obvious for many, but it is very
-easy to get caught up in the libraries that we&amp;rsquo;re hearing about rather than what is best for our particular use case.&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;Thanks for reading! I&amp;rsquo;ll be speaking at &lt;a href="https://lonestarelixir.com/2019/" target="_blank"&gt;Lonestar ElixirConf&lt;/a&gt; about bringing Elixir to production,
-looking at both human and tech challenges in doing so.&lt;/p&gt;
 </content>
   </entry>
 </feed>

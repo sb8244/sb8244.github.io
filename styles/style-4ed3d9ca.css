@@ -173,6 +173,9 @@ h2 {
 .single-article h1 {
   margin-top: 0; }
 
+#article-verifying-queries-with-ecto-s-prepare_query\% code.hljs {
+  max-height: 300px; }
+
 .home-link {
   padding: 15px 0; }
 

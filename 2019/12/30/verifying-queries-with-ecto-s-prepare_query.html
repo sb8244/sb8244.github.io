@@ -1,0 +1,304 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - Verifying Queries with Ecto's prepare_query Callback</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-4ed3d9ca.css" rel="stylesheet" />
+    <link href="/styles/atom-one-light-eda63d8c.css" rel="stylesheet" />
+    <script src="/js/highlight.min-105fddac.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Software Engineering Blog</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container" id="article-verifying-queries-with-ecto-s-prepare_query%">
+    <article class="single-article">
+      <header class="home-link">
+        <a href="/">&lsaquo; Home</a>
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </header>
+
+      <h1>Verifying Queries with Ecto's prepare_query Callback</h1>
+      <p>You can use many different techniques to build and scale Software as a Service applications. One technique that is very popular is
+to use a single database for multiple paying customers. This multi-tenant approach to SaaS works well for many people, but there are
+a few dangers to look out for. The biggest danger is the risk of cross-tenant data leaking. I consider this the worst possible scenario
+for a multi-tenant SaaS application, even beyond a full system outage.</p>
+
+<p>In this post, we&rsquo;re going to look at a technique to guarantee that cross-tenant leaks don&rsquo;t happen in an Elixir application. We&rsquo;ll be
+looking at Ecto&rsquo;s new(ish) <code>prepare_query</code> callback and how it can be used to inspect (almost) every query that goes through your
+application. I&rsquo;ll discuss how I test drove a query inspector to inspect every query for tenancy.</p>
+
+<p>The ultimate goal of this post is to serve as a light reference for how I navigated the <code>Ecto.Query</code> struct to implement
+the tenancy enforcer. The biggest challenge that I faced was understanding what went into the structure and how to walk it.</p>
+
+<p>Let&rsquo;s first look at what <code>prepare_query</code> is.</p>
+
+<h2>Ecto&rsquo;s <code>prepare_query</code> Callback</h2>
+
+<p>The <a href="https://hexdocs.pm/ecto/Ecto.Repo.html#c:prepare_query/3" target="_blank"><code>prepare_query</code></a> callback was introduced in September of 2019. You
+can define a function (<code>prepare_query</code>) in your <code>Application.Repo</code> module. The function is invoked before a query is executed, and you
+are provided the full query structure as well as some metadata.</p>
+
+<p>With <code>prepare_query</code>, you can inspect the query or even modify it. The Ecto documentation gives an example where a Repo filters out
+&ldquo;soft deleted&rdquo; records unless the user is an admin. It looks like this:</p>
+
+<pre><code class="elixir"># From https://hexdocs.pm/ecto/Ecto.Repo.html#c:prepare_query/3
+
+@impl true
+def prepare_query(_operation, query, opts) do
+  if opts[:admin] do
+    {query, opts}
+  else
+    query = from(x in query, where: is_nil(x.deleted_at))
+    {query, opts}
+  end
+end
+</code></pre>
+
+<p>We can use this to detect whether a query has tenancy set correctly. We won&rsquo;t actually modify the query in this post, due to
+concerns I have with how that approach removes multi-tenancy awareness.</p>
+
+<p>In order to get started, we&rsquo;ll need to define a function that shows us the <code>Ecto.Query</code> structure. Let&rsquo;s do that next.</p>
+
+<h2>Understanding Ecto Query Structure from Inspect Protocol</h2>
+
+<p>In order to get started with a runnable example, I modified
+<a href="https://github.com/sb8244/ecto_tenancy_enforcer/blob/master/test/support/tenancy/repo.ex" target="_blank"><code>test/support/tenancy/repo.ex</code></a>
+by replacing <code>prepare_query</code> with the following empty function.</p>
+
+<pre><code class="elixir">  def prepare_query(_operation, query, opts) do
+    IO.inspect query
+    {query, opts}
+  end
+</code></pre>
+
+<p>I can then run the test <code>&quot;valid tenancy is only condition&quot;</code> with <code>mix test test/integration/prepare_test.exs:26</code>, and see the following
+output:</p>
+
+<pre><code>➜  ecto_tenancy_enforcer git:(master) ✗ mix test test/integration/prepare_test.exs:26
+#Ecto.Query&lt;from s0 in &quot;schema_migrations&quot;, lock: &quot;FOR UPDATE&quot;,
+ select: type(s0.version, :integer)&gt;
+Including tags: [line: &quot;26&quot;]
+Excluding tags: [:test]
+
+#Ecto.Query&lt;from c0 in Tenancy.Company, where: c0.tenant_id == 1, select: c0&gt;
+.
+
+Finished in 0.2 seconds
+43 tests, 0 failures, 42 excluded
+</code></pre>
+
+<p>That&rsquo;s not quite helpful, because the <code>Ecto.Query</code> is printed out in text form. We can add <code>structs: false</code> to the <code>IO.inspect</code> call
+and we get a different result.</p>
+
+<pre><code>%{
+  __struct__: Ecto.Query,
+  aliases: %{},
+  assocs: [],
+  combinations: [],
+  distinct: nil,
+  from: %{
+    __struct__: Ecto.Query.FromExpr,
+    as: nil,
+    hints: [],
+    prefix: nil,
+    source: {&quot;companies&quot;, Tenancy.Company}
+  },
+  group_bys: [],
+  havings: [],
+  joins: [],
+  limit: nil,
+  lock: nil,
+  offset: nil,
+  order_bys: [],
+  prefix: nil,
+  preloads: [],
+  select: %{
+    __struct__: Ecto.Query.SelectExpr,
+    expr: {:&amp;, [], [0]},
+    fields: nil,
+    file: &quot;/Users/stephenbussey/src/ecto_tenancy_enforcer/deps/ecto/lib/ecto/query/planner.ex&quot;,
+    line: 814,
+    params: [],
+    take: %{}
+  },
+  sources: nil,
+  updates: [],
+  wheres: [
+    %{
+      __struct__: Ecto.Query.BooleanExpr,
+      expr: {:==, [],
+       [
+         {{:., [], [{:&amp;, [], [0]}, :tenant_id]}, [], []},
+         %{
+           __struct__: Ecto.Query.Tagged,
+           tag: nil,
+           type: {0, :tenant_id},
+           value: 1
+         }
+       ]},
+      file: &quot;/Users/stephenbussey/src/ecto_tenancy_enforcer/test/integration/prepare_test.exs&quot;,
+      line: 27,
+      op: :and,
+      params: []
+    }
+  ],
+  windows: [],
+  with_ctes: nil
+}
+</code></pre>
+
+<p>Alright, now we have the actual struct that we can work with. We are capable of writing a query, inspecting the struct, and then figuring
+out how to walk / enforce that query. If we continued with TDD at this point, we&rsquo;d eventually hit a snag. <code>Ecto.Query</code> represents
+referenced tables (joins, some wheres) with a positional index system. However, the structure doesn&rsquo;t include
+the list of positional references&mdash;you have to build it yourself.</p>
+
+<p>This led to a bit of a pickle, because it&rsquo;s not documented anywhere and is considered an internal query structure. However, we know
+of at least one place that knows how to resolve a positional index into a table / module name (Ecto.Query inspect). Let&rsquo;s find that
+and see what it&rsquo;s doing.</p>
+
+<p>A search for <code>defimpl</code> in Ecto brings us to <a href="https://github.com/elixir-ecto/ecto/blob/b3ee240e91deecfd6d8727946bfc8ed5de752e4f/lib/ecto/query/inspect.ex#L21" target="_blank">this line</a>,
+which is the implementation of <code>Inspect</code> for <code>Ecto.Query</code>. In particular, the following code is of interest to us:</p>
+
+<pre><code class="elixir">  defp to_list(query) do
+    names =
+      query
+      |&gt; collect_sources
+      |&gt; generate_letters
+      |&gt; generate_names
+      |&gt; List.to_tuple()
+
+    ...
+</code></pre>
+
+<p>With this lead, it&rsquo;s possible to use these same functions to create a positional index lookup. You can see a finished example of this
+in <a href="https://github.com/sb8244/ecto_tenancy_enforcer/blob/master/lib/ecto_tenancy_enforcer/source_collector.ex" target="_blank"><code>EctoTenancyEnforcer.SourceCollector</code></a>. I modified this to return the schema module name, rather than a letter or table name, so that I could use my
+<code>enforced_schemas</code> option to check if a referenced table needs checked or not.</p>
+
+<p>We have about as much as we&rsquo;re going to get out of Ecto. At this point, it&rsquo;s possible to jump in and start coding a query verifier to
+do whatever you want. I found myself still a bit lost at this point, but I did know what I wanted to pass / fail. I&rsquo;ll walk through
+the steps I took to test drive a query enforcer.</p>
+
+<h2>Test Driving EctoTenancyEnforcer</h2>
+
+<p>I don&rsquo;t practice test driven development often, but I find it valuable when I have no clue what the solution is going to be, but I
+know what I want it to look like. That is the case in a query enforcer, because it&rsquo;s easy to write out queries that should pass and
+fail into a test suite. I can then go one-by-one to make the incorrect ones fail, while still having the valid ones pass.</p>
+
+<p>I started with a set of very simple tests, like so:</p>
+
+<pre><code class="elixir">test &quot;no filters at all&quot; do
+  assert_raise(TenancyViolation, fn -&gt;
+    Repo.all(Company)
+  end)
+end
+
+test &quot;valid tenancy is only condition&quot; do
+  valid = from c in Company, where: c.tenant_id == 1
+  assert Repo.all(valid) |&gt; length == 1
+end
+</code></pre>
+
+<p>I started with these to build some simple confidence. Once they were passing, I listed out about 40 queries that I knew should work
+or not work. I chipped my way through these and eventually found the patterns in the <code>Ecto.Query</code> struct that led to fairly clean code to
+walk them.</p>
+
+<p>The final result can be seen in the <a href="https://github.com/sb8244/ecto_tenancy_enforcer/blob/master/lib/ecto_tenancy_enforcer/query_verifier.ex" target="_blank"><code>EctoTenancyEnforcer.QueryVerifier</code></a> module. I&rsquo;m sure that there are cases I missed in my TDD, but I&rsquo;m happy enough with this to
+use it in production applications. I&rsquo;ll add new tests as cases are encountered in the wild.</p>
+
+<h2>Wrapping Up</h2>
+
+<p>Ecto&rsquo;s <code>prepare_query</code> callback is incredibly powerful for query inspection and modification. It&rsquo;s a bit dense to get started with,
+due to the <code>Ecto.Query</code> structure being undocumented, but TDD helped me out significantly. The <code>Ecto.Query</code> walking is undocumented,
+but I&rsquo;m anticipating stability in the Query structure going into the future. That may or may not pan out, but I think it&rsquo;s a decent
+bet.</p>
+
+<p>If you&rsquo;re looking for tenancy enforcement in Ecto queries, try out <a href="https://github.com/sb8244/ecto_tenancy_enforcer" target="_blank">EctoTenancyEnforcer</a>.
+You can refer to this repo as a complete example of query enforcement.</p>
+
+<h2>The Book Plug</h2>
+
+<p>My book &ldquo;Real-Time Phoenix: Build Highly Scalable Systems with Channels&rdquo; is now in beta
+through <a href="http://bit.ly/rtp-exq" target="_blank">The Pragmatic Bookshelf</a>. This book explores using Phoenix Channels, GenStage, and more to build
+real-time applications in Elixir. The first draft has been completed for a little bit and the book should be in production by
+February, with print coming at the end of the production process.</p>
+
+<div style="text-align: center">
+  <a href="http://bit.ly/rtp-ecto-tenancy" target="_blank">
+    <img src="/images/sbsockets.jpg" alt="Real-Time Phoenix by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" />
+  </a>
+</div>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/elixir.html">elixir</a>
+          <a href="/tags/engineering.html">engineering</a>
+      </div>
+
+      <div class="signup-footer">
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>
+      hljs.initHighlightingOnLoad();
+
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+
+      (function(i,s,o,g,r,a,m){i['SLScoutObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://scout-cdn.salesloft.com/sl.js','slscout');
+      slscout(["init", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0Ijo0fQ.6U1DzGBGEvWSP6eJRUCY4HI__WzJ9hvuurWnZYiiRfA"]);
+    </script>
+  </body>
+</html>
