@@ -185,6 +185,20 @@ h2 {
 .signup-footer .mc_embed_signup {
   text-align: center; }
 
+.book-hero {
+  display: flex;
+  padding-top: 15px; }
+  .book-hero__content-wrapper {
+    flex-grow: 1;
+    padding-right: 15px; }
+  .book-hero h2 {
+    margin-top: 0; }
+  .book-hero img {
+    border: 1px solid #ccc; }
+
+@media only screen and (max-width: 600px) {
+  .book-hero {
+    flex-direction: column; } }
 /* MailChimp Form Embed Code - Horizontal Super Slim - 12/16/2015 v10.7
 Adapted from: http://blog.heyimcat.com/universal-signup-form/ */
 .mc_embed_signup {
