@@ -10,10 +10,10 @@
   </author>
   <entry>
     <title>Verifying Queries with Ecto's prepare_query Callback</title>
-    <link rel="alternate" href="https://stephenbussey.com/2019/12/30/verifying-queries-with-ecto-s-prepare_query.html"/>
-    <id>https://stephenbussey.com/2019/12/30/verifying-queries-with-ecto-s-prepare_query.html</id>
+    <link rel="alternate" href="https://stephenbussey.com/2019/12/30/verifying-queries-with-ecto-s-prepare-query.html"/>
+    <id>https://stephenbussey.com/2019/12/30/verifying-queries-with-ecto-s-prepare-query.html</id>
     <published>2019-12-30T13:28:00-05:00</published>
-    <updated>2019-12-30T14:35:52-05:00</updated>
+    <updated>2020-04-30T21:25:00-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -233,7 +233,7 @@ February, with print coming at the end of the production process.&lt;/p&gt;
     <link rel="alternate" href="https://stephenbussey.com/2019/10/01/improve-exq-writes-with-pooling.html"/>
     <id>https://stephenbussey.com/2019/10/01/improve-exq-writes-with-pooling.html</id>
     <published>2019-10-01T00:26:00-04:00</published>
-    <updated>2019-10-01T01:57:19-04:00</updated>
+    <updated>2020-04-30T21:25:00-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -482,7 +482,7 @@ real-time applications in Elixir.&lt;/p&gt;
     <link rel="alternate" href="https://stephenbussey.com/2019/08/30/lessons-learned-from-shipping-pushex.html"/>
     <id>https://stephenbussey.com/2019/08/30/lessons-learned-from-shipping-pushex.html</id>
     <published>2019-08-30T19:55:00-04:00</published>
-    <updated>2019-08-30T21:46:28-04:00</updated>
+    <updated>2020-04-30T21:25:00-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -613,7 +613,7 @@ we face when building real-time applications in Elixir.&lt;/p&gt;
     <link rel="alternate" href="https://stephenbussey.com/2019/06/08/elixir-makes-testing-hard-things-easy.html"/>
     <id>https://stephenbussey.com/2019/06/08/elixir-makes-testing-hard-things-easy.html</id>
     <published>2019-06-08T01:59:00-04:00</published>
-    <updated>2019-07-02T13:07:46-04:00</updated>
+    <updated>2020-04-30T21:25:00-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -761,7 +761,7 @@ decent scale on several pieces of our SaaS app. Come check it out!&lt;/p&gt;
     <link rel="alternate" href="https://stephenbussey.com/2019/05/10/useful-elixir-patterns-from-real-world-side-project.html"/>
     <id>https://stephenbussey.com/2019/05/10/useful-elixir-patterns-from-real-world-side-project.html</id>
     <published>2019-05-10T13:00:00-04:00</published>
-    <updated>2019-07-02T13:07:45-04:00</updated>
+    <updated>2020-04-30T21:25:00-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -897,7 +897,7 @@ soon.&lt;/p&gt;
     <link rel="alternate" href="https://stephenbussey.com/2019/03/01/monolith-to-microservice-without-downtime-a-production-story.html"/>
     <id>https://stephenbussey.com/2019/03/01/monolith-to-microservice-without-downtime-a-production-story.html</id>
     <published>2019-03-01T17:35:00-05:00</published>
-    <updated>2019-07-02T13:07:45-04:00</updated>
+    <updated>2020-04-30T21:25:00-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
