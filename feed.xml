@@ -13,7 +13,7 @@
     <link rel="alternate" href="https://stephenbussey.com/2020/05/06/my-experiences-writing-real-time-phoenix.html"/>
     <id>https://stephenbussey.com/2020/05/06/my-experiences-writing-real-time-phoenix.html</id>
     <published>2020-05-06T17:21:00-04:00</published>
-    <updated>2020-05-15T15:49:42-04:00</updated>
+    <updated>2020-05-15T15:50:39-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -45,7 +45,7 @@
 
 &lt;p&gt;My initial proposal was all about WebSocket and writing apps with them. This was a bad proposal. He got me to flip this a bit into building scalable real-time systems (the final product vs the technology used).&lt;/p&gt;
 
-&lt;p&gt;It was a big hit with the team. I was asked to send a formal proposal, which involves writing a meaty chapter from the book. This ended up being thirty pages of content. They reviewed this and it was accepted! I was going to write with Pragmatic! I was actually on the ski chairlift with my dad when the call from Bruce came in about it. I was so happy that I&amp;rsquo;m pretty sure I cried a bit.&lt;/p&gt;
+&lt;p&gt;The new short-form proposal was well-received by the team. I was asked to send a formal proposal, which involves writing a meaty chapter from the book. This ended up being thirty pages of content. They reviewed this and it was accepted! I was going to write with Pragmatic! I was actually on the ski chairlift with my dad when the call from Bruce came in about it. I was so happy that I&amp;rsquo;m pretty sure I cried a bit.&lt;/p&gt;
 
 &lt;p&gt;The process between Lonestar Elixir to a signed contract was only about three weeks. I was incredibly impressed by Pragmatic&amp;rsquo;s speed here, and knew it would be a sign of a good relationship.&lt;/p&gt;
 
