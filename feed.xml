@@ -4,16 +4,79 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2020-05-06T17:21:00-04:00</updated>
+  <updated>2020-08-30T12:36:00-04:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>What's Next? Starting Clove</title>
+    <link rel="alternate" href="https://stephenbussey.com/2020/08/30/what-s-next-starting-clove.html"/>
+    <id>https://stephenbussey.com/2020/08/30/what-s-next-starting-clove.html</id>
+    <published>2020-08-30T12:36:00-04:00</published>
+    <updated>2020-08-30T13:22:58-04:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;In my previous post about writing Real-Time Phoenix, I questioned what&amp;rsquo;s next and mentioned that there were a few projects that I wanted to flesh out more. I&amp;rsquo;m really excited to announce that the main idea I&amp;rsquo;ve been bouncing around seems promising enough to build a start-up around it.&lt;/p&gt;
+
+&lt;p&gt;My business partner, Andy, and I recently announced our work on &lt;a href="https://cloveapp.io/?utm_source=sb.com" target="_blank"&gt;Clove&lt;/a&gt;. In this post, I&amp;rsquo;m going to share the mission behind Clove, what our tech stack is like, and what is next for us.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/clove/li-banner.jpeg" alt="Clove Banner" /&gt;
+&lt;/div&gt;
+
+&lt;h2&gt;Our Mission with Clove&lt;/h2&gt;
+
+&lt;p&gt;Clove is built around the idea that tech companies want to build a positive customer experience, but they struggle with building that experience between customers and support. Think about emailing the support department of a tool that you use&amp;mdash;are you filled with dread at the process, or excited to get a quick resolution to your problem? We want to make customers excited to get their problem fixed, quickly and easily.&lt;/p&gt;
+
+&lt;p&gt;Our first product is an Intelligent Screen Recorder. Users record their screen and we capture all of the network requests, console logs, and performance data associated with that recording. This allows a support team to get all of the relevant information that they&amp;rsquo;d need to triage and potentially identify root-cause of a problem, without the customer needing to get on a screen share to figure out how to capture all of this data.&lt;/p&gt;
+
+&lt;p&gt;We&amp;rsquo;re going to expand further into the interface between support and their customers. We have some other ideas that we&amp;rsquo;re mulling on, but we are looking to do more customer discovery to identify what&amp;rsquo;s best. If you are interested in sharing your perspective, please reach out!&lt;/p&gt;
+
+&lt;h2&gt;Clove&amp;rsquo;s Tech Stack&lt;/h2&gt;
+
+&lt;p&gt;The core of Clove is our Chrome extension that enables end-users to quickly record their screen. The extension is written completely in TypeScript, and the UI is built with React and Material UI.&lt;/p&gt;
+
+&lt;p&gt;The most useful part of the extension architecture is a redux store that is driven by &lt;a href="https://github.com/tshaddix/webext-redux" target="_blank"&gt;webext-redux&lt;/a&gt;. This library lets you keep all of your data in the background page, and then the frontend views are automatically synchronized with that state. With this library, we are able to store all of the complex recording information in the background page, which we expose as a UI that is written with plain ol&amp;rsquo; React and Redux. We have a few UIs that are based on this state, such as the extension popup and the recording upload page.&lt;/p&gt;
+
+&lt;p&gt;Clove&amp;rsquo;s backend is an Elixir monolith (that we intend to keep as such as we grow). Absinthe is used to provide a GQL API to the extension, but the bulk of the backend is powered by Phoenix LiveView. LiveView has been really great to work with, and has interfaced well with &lt;a href="https://github.com/material-components/material-components-web" target="_blank"&gt;Material Components Web&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;My favorite part of this stack is the re-use we get between the extension and the LiveView UI. We have a fairly complex React page that displays all of the diagnostic information for that recording session. This code is included in the LiveView app with about 15 lines of TypeScript and a git submodule. Complete code re-use without any hassle.&lt;/p&gt;
+
+&lt;p&gt;Here&amp;rsquo;s an example of the Chrome Extension version next to the in-app version. For the in-app version, the comments, page routing, and layout is all handled by LiveView.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/clove/clove-extension-network.png" alt="Clove's interface displaying a screen recording and network panel" /&gt;
+&lt;/div&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;img src="/images/clove/clove-in-app.png" alt="Clove's in-app view demonstrating code re-use with the extension view" /&gt;
+&lt;/div&gt;
+
+&lt;h2&gt;What&amp;rsquo;s Next for Clove?&lt;/h2&gt;
+
+&lt;p&gt;We&amp;rsquo;re working on getting off the ground with our initial product offering. We are bootstrapping (no VC $), so we&amp;rsquo;re very aware of the importance of a meaningful product offering that generates revenue. Once we have a few customers, we are going to expand further into the support space to develop a tighter product market fit.&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;m sure I&amp;rsquo;ll write a few more blog posts about what the tech is like at Clove. I think it&amp;rsquo;s actually very exciting and has been a very effective tech stack so far. I could see posts digging deeper into Chrome Extension APIs, starting a company through Stripe Atlas, the cross-context Redux pattern, or the LiveView&amp;lt;-&amp;gt;React code re-use that we have. Reach out on Twitter if anything sounds interesting to read about.&lt;/p&gt;
+
+&lt;h2&gt;The Book Plug&lt;/h2&gt;
+
+&lt;p&gt;My book &amp;ldquo;Real-Time Phoenix: Build Highly Scalable Systems with Channels&amp;rdquo; is available
+through &lt;a href="http://bit.ly/rtp-clove" target="_blank"&gt;The Pragmatic Bookshelf&lt;/a&gt;. This book explores using Phoenix Channels, GenStage, and more to build real-time applications in Elixir.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;a href="http://bit.ly/rtp-clove" target="_blank"&gt;
+    &lt;img src="/images/sbsockets.jpg" alt="Real-Time Phoenix by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" /&gt;
+  &lt;/a&gt;
+&lt;/div&gt;
+</content>
+  </entry>
   <entry>
     <title>My Experiences Writing Real-Time Phoenix</title>
     <link rel="alternate" href="https://stephenbussey.com/2020/05/06/my-experiences-writing-real-time-phoenix.html"/>
     <id>https://stephenbussey.com/2020/05/06/my-experiences-writing-real-time-phoenix.html</id>
     <published>2020-05-06T17:21:00-04:00</published>
-    <updated>2020-05-15T16:02:47-04:00</updated>
+    <updated>2020-08-30T13:06:01-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -137,7 +200,7 @@
     <link rel="alternate" href="https://stephenbussey.com/2019/12/30/verifying-queries-with-ecto-s-prepare-query.html"/>
     <id>https://stephenbussey.com/2019/12/30/verifying-queries-with-ecto-s-prepare-query.html</id>
     <published>2019-12-30T13:28:00-05:00</published>
-    <updated>2019-12-30T14:35:52-05:00</updated>
+    <updated>2020-08-30T13:05:47-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -357,7 +420,7 @@ February, with print coming at the end of the production process.&lt;/p&gt;
     <link rel="alternate" href="https://stephenbussey.com/2019/10/01/improve-exq-writes-with-pooling.html"/>
     <id>https://stephenbussey.com/2019/10/01/improve-exq-writes-with-pooling.html</id>
     <published>2019-10-01T00:26:00-04:00</published>
-    <updated>2019-10-01T01:57:19-04:00</updated>
+    <updated>2020-08-30T12:35:36-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -606,7 +669,7 @@ real-time applications in Elixir.&lt;/p&gt;
     <link rel="alternate" href="https://stephenbussey.com/2019/08/30/lessons-learned-from-shipping-pushex.html"/>
     <id>https://stephenbussey.com/2019/08/30/lessons-learned-from-shipping-pushex.html</id>
     <published>2019-08-30T19:55:00-04:00</published>
-    <updated>2019-08-30T21:46:28-04:00</updated>
+    <updated>2020-08-30T12:35:36-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -737,7 +800,7 @@ we face when building real-time applications in Elixir.&lt;/p&gt;
     <link rel="alternate" href="https://stephenbussey.com/2019/06/08/elixir-makes-testing-hard-things-easy.html"/>
     <id>https://stephenbussey.com/2019/06/08/elixir-makes-testing-hard-things-easy.html</id>
     <published>2019-06-08T01:59:00-04:00</published>
-    <updated>2019-07-02T13:07:46-04:00</updated>
+    <updated>2020-08-30T12:35:36-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -878,142 +941,6 @@ other languages I&amp;rsquo;ve worked with. If you&amp;rsquo;re looking for a wa
 can find more details at &lt;a href="https://elixirconf.com/2019/training-classes/2" target="_blank"&gt;https://elixirconf.com/2019/training-classes/2&lt;/a&gt;. We&amp;rsquo;ll
 be focused on writing real-time systems, and will specifically be leveraging a lot of real world lessons from doing this at
 decent scale on several pieces of our SaaS app. Come check it out!&lt;/p&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Useful Elixir Patterns from Real-world Side Project</title>
-    <link rel="alternate" href="https://stephenbussey.com/2019/05/10/useful-elixir-patterns-from-real-world-side-project.html"/>
-    <id>https://stephenbussey.com/2019/05/10/useful-elixir-patterns-from-real-world-side-project.html</id>
-    <published>2019-05-10T13:00:00-04:00</published>
-    <updated>2019-07-02T13:07:45-04:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I believe that one of the best ways to push new practices is to work on a real-world project that we
-can afford to experiment on. We can push the boundary in the toy project while still seeing the results
-of the decisions in a production environment with real users. I&amp;rsquo;ve been fortunate to be able to ship
-several applications like this at SalesLoft. The latest one that we&amp;rsquo;ll look at today is our internal OKR (Objective-Key Result) app that we use for goal tracking and alignment.&lt;/p&gt;
-
-&lt;p&gt;We&amp;rsquo;ll walk through this project and see several different patterns that I like. Some of these patterns
-have been used in several different projects of mine and have held up well. Others were new experiments
-that I hope to use again in the future.&lt;/p&gt;
-
-&lt;p&gt;The source code for the application can be found on &lt;a href="https://github.com/sb8244/okr_app_pub" target="_blank"&gt;Github&lt;/a&gt;. The useful
-part is the code and tests, less so the specific functionality.&lt;/p&gt;
-
-&lt;h1&gt;Context Usage&lt;/h1&gt;
-
-&lt;p&gt;Contexts, at least as I use them, are all about establishing an application domain and keeping
-the interfaces small and useful for other parts of the system to use. I&amp;rsquo;ve done this in the past but
-really pushed it for this project by having no function usage other than top level modules. This
-pattern allows us to have a well-defined interface for the application, which makes it simpler for both
-us and others to modify the code and understand the consequences.&lt;/p&gt;
-
-&lt;p&gt;As an example, the following would not be acceptable:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="elixir"&gt;MyApp.SomeContext.ASpecificQuery.execute(params)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Instead, I would prefer this:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="elixir"&gt;MyApp.SomeContext.a_query(params)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;All of my contexts live under the &lt;code&gt;OkrApp&lt;/code&gt; module. You can see a list of them in the &lt;a href="https://github.com/sb8244/okr_app_pub/tree/master/lib/okr_app" target="_blank"&gt;okr_app folder&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;I started off the application by writing code directly in the context. Some of this is still seen because
-I didn&amp;rsquo;t go back through and change everything once I solidified on what I wanted. In the end, I found
-that &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/analytics.ex#L5" target="_blank"&gt;function delegates&lt;/a&gt;
-allowed the context to be very easy to digest and I could write tests for the underlying modules in distinct
-files.&lt;/p&gt;
-
-&lt;p&gt;The hardest part of this pattern, that I haven&amp;rsquo;t figured out yet, is how to handle Ecto schemas between
-contexts. Sometimes, a context needs to leak out. For example, a &lt;code&gt;User&lt;/code&gt; schema may need to be referenced
-by the &lt;code&gt;AnalyticsEvent&lt;/code&gt; schema (as seen &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/analytics/analytics_event.ex#L11" target="_blank"&gt;here&lt;/a&gt;).
-I found this acceptable because I wasn&amp;rsquo;t invoking logic outside of the context interface.&lt;/p&gt;
-
-&lt;p&gt;The advantage of Context came out when I built the &lt;a href="https://github.com/sb8244/okr_app_pub/tree/master/lib/okr_app/mailer" target="_blank"&gt;mailer&lt;/a&gt;.
-I found it very simple to add in this new code without worrying about anything breaking. I was also to extract concepts
-specific to the mailer (such as &lt;code&gt;Recipient&lt;/code&gt;) rather than relying on generic modules prone to change such as &lt;code&gt;User&lt;/code&gt;.&lt;/p&gt;
-
-&lt;h1&gt;Isolated Logic (Context) for SCIM&lt;/h1&gt;
-
-&lt;p&gt;One of the requirements for this project was SCIM (System for Cross-domain Identity Management). We use Okta internally and
-they have a lot of docs on how to write a SCIM integration. I didn&amp;rsquo;t want the details of SCIM leaking into the system too
-heavily. I was able to leverage a SCIM Context to achieve this goal in a way that I am pretty satisfied with.&lt;/p&gt;
-
-&lt;p&gt;SCIM has all of its web functionality extracted into a module called &lt;code&gt;Scim.Web&lt;/code&gt;. &lt;code&gt;Phoenix.Router&lt;/code&gt; is used to provide the
-appropriate endpoint definitions, but the integration happens in a simple &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/scim/web/plug.ex#L13" target="_blank"&gt;Plug&lt;/a&gt;
-which is used by &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app_web/router.ex#L43" target="_blank"&gt;&lt;code&gt;OkrAppWeb.Router&lt;/code&gt;&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;The entire &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/scim/web/users_controller.ex#L9" target="_blank"&gt;SCIM controller&lt;/a&gt; leverages
-a behavior passed into it. This is the &lt;a href="https://en.wikipedia.org/wiki/Strategy_pattern" target="_blank"&gt;strategy pattern&lt;/a&gt; at work.
-I didn&amp;rsquo;t create a specific &lt;code&gt;Behaviour&lt;/code&gt; requirement for this module but probably should have, because it has an expected
-interface.&lt;/p&gt;
-
-&lt;p&gt;The actual SCIM application integration happens in &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/users_scim.ex" target="_blank"&gt;UsersScim&lt;/a&gt;.
-This code is a bit ugly since I didn&amp;rsquo;t clean it up too much, but it&amp;rsquo;s nice that the implementation doesn&amp;rsquo;t leak into my
-application API nor does it leak into other contexts.&lt;/p&gt;
-
-&lt;h1&gt;ListQuery Module&lt;/h1&gt;
-
-&lt;p&gt;I really like Ecto&amp;rsquo;s API for querying data, but I have found it cumbersome to build up dynamic queries from API params easily.
-I wrote a &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/query/list_query.ex" target="_blank"&gt;&lt;code&gt;ListQuery&lt;/code&gt;&lt;/a&gt; some time ago that I brought into this project.&lt;/p&gt;
-
-&lt;p&gt;The ListQuery is used to take provided &lt;code&gt;params&lt;/code&gt; and &lt;code&gt;opts&lt;/code&gt; and turns it into an Ecto compatible query. Sometimes advanced
-queries are required and I devised a small way to do that by stripping certain &lt;code&gt;params&lt;/code&gt; and then reapplying them. You can
-see that &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives/store/cycle_store.ex#L11" target="_blank"&gt;here&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;I&amp;rsquo;m able to leverage a &lt;code&gt;ListQuery&lt;/code&gt; powered function in &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app_web/controllers/api/objective_link_controller.ex#L11" target="_blank"&gt;various controllers&lt;/a&gt;
-by passing in the user params. If you use this pattern in an environment with non-friendly users, you should probably sanitize
-the input to not leak any information to the client.&lt;/p&gt;
-
-&lt;h1&gt;SimpleEctoStore Module&lt;/h1&gt;
-
-&lt;p&gt;My contexts use &lt;code&gt;defdelegate&lt;/code&gt; to send queries to a different module. I called the module a &amp;ldquo;store&amp;rdquo; and found myself
-&lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives.ex#L13" target="_blank"&gt;delegating to them often&lt;/a&gt;.
-Writing the same code again and again in the store became a bit cumbersome. Often, I would be writing the most
-simple code possible with just the module name changed.&lt;/p&gt;
-
-&lt;p&gt;My solution to this copy/paste problem was to build a macro powered &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/store/simple_ecto_store.ex" target="_blank"&gt;&lt;code&gt;SimpleEctoStore&lt;/code&gt;&lt;/a&gt;.
-Each usage of &lt;code&gt;SimpleEctoStore&lt;/code&gt; involved passing in the schema module as well as what methods were desired to be
-pulled in. You can see this &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives/store/objective_link_store.ex#L2" target="_blank"&gt;here&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;This allowed me to remove the boiler plate for a large number of ecto stores. If I used a concept like stores again,
-I would definitely repeat this one.&lt;/p&gt;
-
-&lt;h1&gt;Things that didn&amp;rsquo;t work as well&lt;/h1&gt;
-
-&lt;p&gt;One of the biggest pain points I had was defining how I wanted my JSON API to work. At work, I follow the philosophy of very focused
-endpoints that don&amp;rsquo;t preload many models together. This is for performance and flexibility reasons. Doing that in this project
-made it much more complex for me and was going to take time that I didn&amp;rsquo;t want to spend. The end result here is that I
-have a massive endpoint called &amp;ldquo;Okr&amp;rdquo; that &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app_web/serializers/okr.ex" target="_blank"&gt;embeds many associations&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;The preload for my Okr endpoint is &lt;a href="https://github.com/sb8244/okr_app_pub/blob/master/lib/okr_app/objectives/okr_preloader.ex" target="_blank"&gt;pretty gnarly&lt;/a&gt; as
-well. However, I was thrilled to be able to pass queries into the preload clauses which means that I removed the risk of
-accidentally leaking data that is queried out of the system but then not handled properly by me in Elixir.&lt;/p&gt;
-
-&lt;p&gt;Another thing that I still feel awkward about is a context&amp;rsquo;s schema referencing a different context&amp;rsquo;s schema. I wanted to
-remove this but couldn&amp;rsquo;t figure out how to do so in a way I liked.&lt;/p&gt;
-
-&lt;h1&gt;Summary&lt;/h1&gt;
-
-&lt;p&gt;Contexts allowed for a focused API between parts of an application. Using them saved me some mental gymnastics as I was
-developing the application. I was particularly happy with how I was able to isolate the sort of whacky SCIM API via
-focused context modules.&lt;/p&gt;
-
-&lt;p&gt;&lt;code&gt;ListQuery&lt;/code&gt; and &lt;code&gt;SimpleEctoStore&lt;/code&gt; both made my life easier while defining my ecto based queries and stores. These are generically
-applicable modules that could be brought into other applications if needed.&lt;/p&gt;
-
-&lt;p&gt;I am really happy overall with how this project turned out. It is easy to read through nearly 6 months after I&amp;rsquo;ve originally
-built it and has been running without any Elixir issues since that time. I&amp;rsquo;ll be applying these patterns to future projects,
-for sure, and hope you are able to get some value from it!&lt;/p&gt;
-
-&lt;hr&gt;
-
-&lt;p&gt;Thanks for reading! I&amp;rsquo;ll be teaching a class at ElixirConf US about building scalable real-time systems in Elixir. I&amp;rsquo;ve been
-focused a lot on this topic so I&amp;rsquo;m pretty thrilled to share what I&amp;rsquo;ve learned. I believe that registration will open
-soon.&lt;/p&gt;
 </content>
   </entry>
 </feed>
