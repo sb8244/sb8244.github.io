@@ -4,10 +4,66 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2020-08-30T12:36:00-04:00</updated>
+  <updated>2021-04-23T16:00:00-04:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
+  <entry>
+    <title>On Culture: Ending 7 Years at SalesLoft</title>
+    <link rel="alternate" href="https://stephenbussey.com/2021/04/23/on-culture-ending-7-years-at-salesloft.html"/>
+    <id>https://stephenbussey.com/2021/04/23/on-culture-ending-7-years-at-salesloft.html</id>
+    <published>2021-04-23T16:00:00-04:00</published>
+    <updated>2021-04-23T16:44:24-04:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;Today is my final day at SalesLoft. I&amp;rsquo;m moving to a full-time focus on Clove, which has pivoted into a much better product since my first post on it. I have some thoughts on writing about the technology powering Clove. We&amp;rsquo;re doing a lot of—I think—interesting things with Elixir to build a really great product.&lt;/p&gt;
+
+&lt;p&gt;This post isn&amp;rsquo;t about that, though. I was reflecting on the most important thing that I learned at SalesLoft. What helped me grow the most? What kept me there for 7 years—an eternity in startup land? The answer is culture. I know, I know. Some people really don&amp;rsquo;t like that word, but let&amp;rsquo;s talk about it.&lt;/p&gt;
+
+&lt;h2&gt;Early Company&lt;/h2&gt;
+
+&lt;p&gt;The importance of culture was present from the very first conversation that I had with Rob, Kyle, and Tim—the founding team. They made clear that culture is not about tangible benefits you get from a company, but rather it&amp;rsquo;s about the shared set of values that the team is founded around. Values are the things that are never intentionally compromised on. If there&amp;rsquo;s a tough decision to make or challenge to tackle, the values must the center point of the thought-process.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;How are the core values of an early team established?&lt;/strong&gt; It&amp;rsquo;s going to be based around the founders. In the case of SalesLoft the values were positive, supportive, and self-starting. This came from Pardot, which David Cummings (early SL investor) was the founder of.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;How are the core values played out?&lt;/strong&gt; They really need to be embraced by the team early on. This involves making them a center of conversation in all-hands, calling people out (kindly) if they aren&amp;rsquo;t living them, and involving them in hiring decisions.&lt;/p&gt;
+
+&lt;h2&gt;Middle Stages&lt;/h2&gt;
+
+&lt;p&gt;As the company matures and increases hiring (let&amp;rsquo;s say 100 employees in), the feeling in the company changed as well. Corporate policies are being played out more. Interviews are happening more frequently and with more applicants.&lt;/p&gt;
+
+&lt;p&gt;SalesLoft tripled down on values during this period. It was great having focused discussions about the values, what they mean, and how they can help us interact better as a team. In particular, conflict resolution and how to directly face issues rather than triangulating were effective in helping to reenforce the values. I really looked forward to monthly all-hands breakfast where content about improving team health was presented.&lt;/p&gt;
+
+&lt;p&gt;Trust was very much at the foundation of everything that we did. If you lookup the &amp;ldquo;5 functions of a team&amp;rdquo; model, you&amp;rsquo;ll see what I mean. One of the great quotes that always sticks with me is to &amp;ldquo;always assume positive intent&amp;rdquo; and &amp;ldquo;understand that you&amp;rsquo;re working towards the same outcome.&amp;rdquo; If a team member and I heavily disagreed about something, we could base ourselves around the outcome and realize that we&amp;rsquo;re reaching for the same thing.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;How might the core values of the team change?&lt;/strong&gt; I think minimal amount of change is a good thing in the foundational values (unless they were just bad and need redone). In SalesLoft&amp;rsquo;s case, aspirational values were added to the foundational values. Even to this day the original foundational values haven&amp;rsquo;t changed, although they moved from single words to phrases. The aspirational values were ultimately replaced again with two foundational ones.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;How are the core values played out?&lt;/strong&gt; Team-building and trust are very important as teams are increasing in size. Communication becomes more difficult and fraught with misunderstandings. Values help the team center around the common foundation to solve problems. In addition, hiring has to evolve in this period of time. Hiring should involve focused culture-fit interviews that use a standardized path of questions and rubric. There should not be &amp;ldquo;gut feeling&amp;rdquo; in the hiring process, especially at this point.&lt;/p&gt;
+
+&lt;h2&gt;Evolving into Enterprise&lt;/h2&gt;
+
+&lt;p&gt;I&amp;rsquo;m not sure if SalesLoft is at the point of counting as enterprise or not, although in my shoes 500 people was a lot compared to the original 10. At this point, hiring and employee churn start to become more visible. The percentage of churn doesn&amp;rsquo;t necessarily go up, but having 5x more employees means that the raw numbers will be 5x higher.&lt;/p&gt;
+
+&lt;p&gt;As a company expands into departments the size of SMBs, values can really easily slip. I think it&amp;rsquo;s really important for the values to be lived and talked about both top-down and bottoms-up. The content around team-building and values is also important at this point, even more so than early days. SalesLoft had a great leadership course that people could take. It wasn&amp;rsquo;t a management course, to be clear, but discussed being a leader in role and values. I really enjoyed it.&lt;/p&gt;
+
+&lt;p&gt;One exercise that stuck out to me, recently, was the co-founder Rob doing a clearing model exercise with one of his direct reports. She cleared an event that had bothered her the week before, in front of 500 people on zoom. The significance of this is that leaders need to be vulnerable, humble, and involved as the business grows. Otherwise, the values will slip.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;How might the core values change?&lt;/strong&gt; I am not convinced that values changing at this point is a good thing. I have seen history of companies that go from a few effective values to way too many as the company gets larger. Values are not a means of control, and so keeping the foundation stable seems like a good idea. SalesLoft did not change the values so far in this stage, which I&amp;rsquo;m happy about.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;How are the core values played out?&lt;/strong&gt; Things will look pretty similar at this point, but I think it&amp;rsquo;s easier for microcosms to form where values might slip a little. Give awareness to everyone in the company about the values, what&amp;rsquo;s expected, and empower them to talk to their peers about issues.&lt;/p&gt;
+
+&lt;p&gt;This is definitely the company stage where I have the least practical experience, though.&lt;/p&gt;
+
+&lt;h2&gt;Future?&lt;/h2&gt;
+
+&lt;p&gt;I am curious to see how SalesLoft will evolve its value system in the future. I won&amp;rsquo;t be along for the journey, but I hold a lot of confidence in the leadership team and the people that I interacted with on the daily.&lt;/p&gt;
+
+&lt;p&gt;I&amp;rsquo;m excited to take what I&amp;rsquo;ve seen and learned into my role as founder at Clove. We have a &lt;a href="https://cloveapp.io/about/" target="_blank"&gt;set of values&lt;/a&gt; at Clove, and they were based around our shared experience at SalesLoft.&lt;/p&gt;
+
+&lt;p&gt;The most important thing to recognize about values is that no one is perfect. Things will slip, people will mess up now and then. There&amp;rsquo;s no shame in that. Recognize the importance of this as a learning opportunity, as it ultimately shapes how people apply core values in their daily actions.&lt;/p&gt;
+</content>
+  </entry>
   <entry>
     <title>What's Next? Starting Clove</title>
     <link rel="alternate" href="https://stephenbussey.com/2020/08/30/what-s-next-starting-clove.html"/>
@@ -793,154 +849,6 @@ we face when building real-time applications in Elixir.&lt;/p&gt;
     &lt;img src="/images/sbsockets.jpg" alt="Real-Time Phoenix by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" /&gt;
   &lt;/a&gt;
 &lt;/div&gt;
-</content>
-  </entry>
-  <entry>
-    <title>Elixir Makes Testing Hard Things Easy</title>
-    <link rel="alternate" href="https://stephenbussey.com/2019/06/08/elixir-makes-testing-hard-things-easy.html"/>
-    <id>https://stephenbussey.com/2019/06/08/elixir-makes-testing-hard-things-easy.html</id>
-    <published>2019-06-08T01:59:00-04:00</published>
-    <updated>2021-04-22T10:33:12-04:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html">&lt;p&gt;I love Elixir. If we&amp;rsquo;ve talked at a conference or you work with me, you know this. I constantly find small nuggets
-when working with Elixir that simply bring joy to me. One of these nuggets recently emerged that I thought worth
-sharing.&lt;/p&gt;
-
-&lt;h1&gt;Backstory&lt;/h1&gt;
-
-&lt;p&gt;I&amp;rsquo;m working on some learning material right now for real-time system development. One of the key aspects of a section
-is about how important measurement is. Without measurement, how do we have any confidence that our running system
-is healthy?&lt;/p&gt;
-
-&lt;p&gt;I&amp;rsquo;m using StatsD for this section because it&amp;rsquo;s fairly well-adopted and is conceptually simple to understand. However,
-I kept bumping into small inefficiencies in my flow. An example of this is that I use a Node program called &lt;code&gt;statsd-logger&lt;/code&gt;
-to view my metrics in development. It felt a bit strange to have a reader install this Node program to view logs in our
-Elixir app.&lt;/p&gt;
-
-&lt;p&gt;The same problem came up today when I was writing tests for the StatsD metrics. I would typically use Mockery to test that
-Statix, my client, is correctly called. If I went down this path, I&amp;rsquo;d be putting a lot on the reader in terms of understanding
-what the heck a mock is and when to use it. Ideally, we&amp;rsquo;ll have 1 line of code max additional setup.&lt;/p&gt;
-
-&lt;p&gt;Okay, enough of the backstory. I wanted to fix these two very specific problems. Let&amp;rsquo;s get into the more interesting bits.&lt;/p&gt;
-
-&lt;h1&gt;Elixir is Many Programs&lt;/h1&gt;
-
-&lt;p&gt;Elixir runs processes in a way that makes them feel like little independent programs. We can spin up tens of thousands of these
-programs without any issue at all. We can even spin up programs that we may consider expensive, such as a webserver.&lt;/p&gt;
-
-&lt;p&gt;The real jewel of these many programs is that they are given a simple and efficient way to communicate with each other, message
-passing. To take the web server example to the extreme, we could spin up 5 different servers on 5 ports and interface with them
-through our browser. Behind the scenes, these &amp;ldquo;servers&amp;rdquo; would be in the same Elixir VM and could be passing messages back and forth
-nearly freely.&lt;/p&gt;
-
-&lt;p&gt;This is conceptually interesting, to me, because it means that traditionally complex or standalone applications can be run in the
-same program (very easily) and can share information.&lt;/p&gt;
-
-&lt;p&gt;Let&amp;rsquo;s see how this applies to StatsD.&lt;/p&gt;
-
-&lt;h1&gt;Just run a Server&lt;/h1&gt;
-
-&lt;p&gt;What if we just ran a StatsD server in our Elixir application? It could listen on a port and accept messages. We could do whatever
-we wanted with these messages, like log them out or store them. Let&amp;rsquo;s do that in a few lines of code:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="elixir"&gt;$ iex
-iex(1)&amp;gt; :gen_udp.open(8126, active: true)
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;We&amp;rsquo;ve started a &amp;ldquo;UDP server&amp;rdquo; in our terminal. Let&amp;rsquo;s send it some messages (open new terminal):&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="elixir"&gt;# Your mileage may vary, fingers crossed
-$ echo -n &amp;quot;hello:1&amp;quot; | nc -4u -w0 localhost 8126
-$ echo -n &amp;quot;hello:2&amp;quot; | nc -4u -w0 localhost 8126
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Now let&amp;rsquo;s go back to the original iex terminal:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="elixir"&gt;iex(2)&amp;gt; flush()
-{:udp, #Port&amp;lt;0.5&amp;gt;, {127, 0, 0, 1}, 61814, &amp;#39;hello:1&amp;#39;}
-{:udp, #Port&amp;lt;0.5&amp;gt;, {127, 0, 0, 1}, 61515, &amp;#39;hello:2&amp;#39;}
-:ok
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Woah! We received the UDP packets as messages to our process. That&amp;rsquo;s super neat to me because of how simple it was (due to
-the great backing work of Erlang/OTP.)&lt;/p&gt;
-
-&lt;p&gt;So what if this was the solution to problem 1 (statsd-logger)? We could start a UDP server and log out messages. I threw together
-a quick library for that purpose called &lt;a href="https://github.com/sb8244/statsd_logger" target="_blank"&gt;StatsDLogger&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;That worked out nicely. What about testing, though? Let&amp;rsquo;s take what we just wrote and apply it to tests.&lt;/p&gt;
-
-&lt;h1&gt;Test Anything Easily&lt;/h1&gt;
-
-&lt;p&gt;Testing can sometimes be hard. Integration testing across multiple servers is usually hard. What level do we start to mock at? We can&amp;rsquo;t
-actually run all of our services all of the time without having very slow tests. To help solve this, we can take what we just did and apply it to
-tests. There is a key question though, how do we actually write an assertion against our server?&lt;/p&gt;
-
-&lt;p&gt;In Elixir, message passing is champion. If you have a process&amp;rsquo;s ID, you can send it a message and it will go into that process&amp;rsquo;s mailbox.
-With ExUnit, this mailbox can be asserted against by using &lt;code&gt;assert_receive&lt;/code&gt;. This means that if we can send our test process
-a message, we can write a test for it.&lt;/p&gt;
-
-&lt;p&gt;It&amp;rsquo;s slightly harder to boil this concept down into an example as simple as the last. Let&amp;rsquo;s look at some code I wrote to
-handle this for StatsD:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="elixir"&gt;  def handle(:valid, name, value, opts) do
-    pid = Keyword.fetch!(opts, :send_to)
-    send(pid, {:statsd_recv, name, value})
-  end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;We can handle a metric by sending a message to a pid. Now the question is, &amp;ldquo;which pid?&amp;rdquo; The process that calls &lt;code&gt;start_link&lt;/code&gt;
-can be referenced with &lt;code&gt;self()&lt;/code&gt;. This means we can do something like this:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="elixir"&gt;  def start_link(opts) do
-    opts = Keyword.merge([send_to: self()], opts)
-    GenServer.start_link(__MODULE__, opts)
-  end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;We can put all of this together to write a test like this:&lt;/p&gt;
-
-&lt;pre&gt;&lt;code class="elixir"&gt;  test &amp;quot;valid / invalid messages are handled&amp;quot; do
-    StatsDLogger.start_link(port: @port, formatter: :send)
-
-    send_event(&amp;quot;a:1&amp;quot;)
-    send_event(&amp;quot;a:2|c&amp;quot;)
-    send_event(&amp;quot;invalid&amp;quot;)
-
-    assert_receive {:statsd_recv, &amp;quot;a&amp;quot;, &amp;quot;1&amp;quot;}
-    assert_receive {:statsd_recv, &amp;quot;a&amp;quot;, &amp;quot;2|c&amp;quot;}
-    assert_receive {:statsd_recv_invalid, &amp;quot;invalid&amp;quot;}
-  end
-&lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;Elixir has made testing this multi-server integration a piece of cake.&lt;/p&gt;
-
-&lt;h1&gt;In the Wild&lt;/h1&gt;
-
-&lt;p&gt;I&amp;rsquo;m definitely not finding any new technique here. The reason I love Elixir is that gems like this are all over open-source
-libraries. The one that comes to mind here is &lt;a href="https://github.com/PSPDFKit-labs/bypass" target="_blank"&gt;Bypass&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;Bypass works by starting an anonymous HTTP server that runs a function when it&amp;rsquo;s invoked. That is a great example of &amp;ldquo;start a
-server&amp;rdquo; to solve how to test that an application makes the right request.&lt;/p&gt;
-
-&lt;p&gt;Phoenix Channels are a great example of &amp;ldquo;send a message&amp;rdquo; in the wild. When you write &lt;code&gt;assert_push&lt;/code&gt;, you&amp;rsquo;re actually just
-&lt;a href="https://github.com/phoenixframework/phoenix/blob/master/lib/phoenix/test/channel_test.ex#L481" target="_blank"&gt;checking for a specific message&lt;/a&gt;.
-The Channel test is wired up so that the test process becomes the &amp;ldquo;socket transport.&amp;rdquo; This allows it to be at the edge of the system
-and capture a lot of test for very little code.&lt;/p&gt;
-
-&lt;h1&gt;Wrapping Up&lt;/h1&gt;
-
-&lt;p&gt;If you&amp;rsquo;re here, thanks for making it through. I love Elixir because of small things like this that would actually be huge in some
-other languages I&amp;rsquo;ve worked with. If you&amp;rsquo;re looking for a way to test complex code, try out message passing as a potential solution.&lt;/p&gt;
-
-&lt;h1&gt;Shameless Plug for ElixirConf&lt;/h1&gt;
-
-&lt;p&gt;My colleague Grant and I are going to give a great training session at ElixirConf Tuesday course. You
-can find more details at &lt;a href="https://elixirconf.com/2019/training-classes/2" target="_blank"&gt;https://elixirconf.com/2019/training-classes/2&lt;/a&gt;. We&amp;rsquo;ll
-be focused on writing real-time systems, and will specifically be leveraging a lot of real world lessons from doing this at
-decent scale on several pieces of our SaaS app. Come check it out!&lt;/p&gt;
 </content>
   </entry>
 </feed>
