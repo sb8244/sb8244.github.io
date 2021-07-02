@@ -4,21 +4,10 @@
   <id>https://stephenbussey.com</id>
   <link href="https://stephenbussey.com"/>
   <link href="https://stephenbussey.com/feed.xml" rel="self"/>
-  <updated>2021-07-01T20:00:00-04:00</updated>
+  <updated>2021-04-23T16:00:00-04:00</updated>
   <author>
     <name>Stephen Bussey</name>
   </author>
-  <entry>
-    <title></title>
-    <link rel="alternate" href="https://stephenbussey.com/2021/07/02/what-is-a-genserver.html"/>
-    <id>https://stephenbussey.com/2021/07/02/what-is-a-genserver.html</id>
-    <published>2021-07-01T20:00:00-04:00</published>
-    <updated>2021-07-02T12:22:31-04:00</updated>
-    <author>
-      <name>Stephen Bussey</name>
-    </author>
-    <content type="html"></content>
-  </entry>
   <entry>
     <title>On Culture: Ending 7 Years at SalesLoft</title>
     <link rel="alternate" href="https://stephenbussey.com/2021/04/23/on-culture-ending-7-years-at-salesloft.html"/>
@@ -726,6 +715,137 @@ real-time applications in Elixir.&lt;/p&gt;
 
 &lt;div style="text-align: center"&gt;
   &lt;a href="http://bit.ly/rtp-exq" target="_blank"&gt;
+    &lt;img src="/images/sbsockets.jpg" alt="Real-Time Phoenix by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" /&gt;
+  &lt;/a&gt;
+&lt;/div&gt;
+</content>
+  </entry>
+  <entry>
+    <title>Lessons Learned from Shipping PushEx</title>
+    <link rel="alternate" href="https://stephenbussey.com/2019/08/30/lessons-learned-from-shipping-pushex.html"/>
+    <id>https://stephenbussey.com/2019/08/30/lessons-learned-from-shipping-pushex.html</id>
+    <published>2019-08-30T19:55:00-04:00</published>
+    <updated>2021-05-13T16:49:21-04:00</updated>
+    <author>
+      <name>Stephen Bussey</name>
+    </author>
+    <content type="html">&lt;p&gt;It&amp;rsquo;s been a while since I announced the initial open-source release of PushEx. We had a few small challenges to solve
+in order to roll it out, and then I let it bake for several months to ensure that it is stable in production. It has
+been running for several months now at production scale, and I cut the first official release of it
+on &lt;a href="https://hex.pm/packages/push_ex" target="_blank"&gt;hex.pm&lt;/a&gt; today. These are some of the challenges and lessons learned from running
+it in production.&lt;/p&gt;
+
+&lt;h2&gt;The project was a big success&lt;/h2&gt;
+
+&lt;p&gt;Let&amp;rsquo;s start with the good news.
+Our goal with the project was to replace our existing push provider, in order to have more control over an important
+part of our tech stack. By &amp;ldquo;push provider&amp;rdquo;, I mean a service that sends data from servers to clients in real-time.
+We needed to replace multiple JavaScript clients and we needed to ensure that the
+pushes were getting queued up from our servers properly.&lt;/p&gt;
+
+&lt;p&gt;This process went very well, due to careful planning and testing on our end. We ran both systems in parallel
+for some time, and slowly ramped the number of pushes from 0 to 100%. Throughout this process, we pushed data to clients
+but did not use it there. We became confident enough to consume the data on the clients through a slow rollout process.
+At this point, the connections to our old provider dropped.&lt;/p&gt;
+
+&lt;p&gt;We were able to avoid downtime or problems throughout this process by very carefully monitoring the application. We
+stopped the rollout at the first sign of trouble, and then resumed once we understood the root cause.&lt;/p&gt;
+
+&lt;h2&gt;The order of process shutdown matters&lt;/h2&gt;
+
+&lt;p&gt;We encountered a large number of errors during the deployment process of the application. This never occurred during
+normal operation, so it seemed a bit odd. The root cause of the errors was that the application would still receive
+requests as it was shutting down. This caused messages to try to push to clients, but the processes involved in that
+were already shut down. This can happen with a Supervisor structure like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;[
+  PushExWeb.Endpoint,
+  PushEx.Pipeline
+]
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;If the pipeline shuts down while the Endpoint is still online, web requests will encounter errors. A better layout
+might look like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;[
+  PushEx.Pipeline,
+  PushExWeb.Endpoint,
+  PushExWeb.ConnectionDrainer
+]
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In order to gain control over the shutdown process of PushEx, I had to make changes to the application supervision tree. I separated
+the &lt;a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex/application.ex#L10" target="_blank"&gt;starting of PushEx&amp;rsquo;s core system&lt;/a&gt;
+from the &lt;a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex/supervisor.ex#L11" target="_blank"&gt;web portion&lt;/a&gt;.
+These changes allow the entire web stack to be gracefully go offline (complete with connection draining) before the data
+pipeline goes offline.&lt;/p&gt;
+
+&lt;p&gt;This leads into the next problem&amp;mdash;how to prevent data loss during application shutdown.&lt;/p&gt;
+
+&lt;h2&gt;Connection draining is critical&lt;/h2&gt;
+
+&lt;p&gt;Connection draining allows a web server to gracefully wait for connections to close before it proceeds with shutting down more of the application.
+HTTP connection draining shuts down the listener process that would accept new connections.&lt;/p&gt;
+
+&lt;p&gt;Several layers of draining are required for PushEx to gracefully exit. They are:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex_web/channels/socket_drainer.ex" target="_blank"&gt;Socket draining&lt;/a&gt; (sockets should gracefully disconnect)&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex/supervisor.ex#L23" target="_blank"&gt;Ranch connection draining&lt;/a&gt; (new web requests shouldn&amp;rsquo;t be handled)&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex/push/drainer.ex" target="_blank"&gt;Push Pipeline draining&lt;/a&gt; (data in
+flight should be given a chance of delivery)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;You&amp;rsquo;ll notice that Socket draining is implemented separately from the connection draining. This is because the connection draining API stops
+the listener from accepting new connections only. If a connection is already established, it has to be manually killed or shut down.&lt;/p&gt;
+
+&lt;p&gt;This process was complex to get right, but now we can reboot servers without errors and without losing data. All of our data
+drains out within the 30 second limit, so your mileage would vary if that&amp;rsquo;s not the case.&lt;/p&gt;
+
+&lt;h2&gt;Big topics affect performance&lt;/h2&gt;
+
+&lt;p&gt;We have a few large push topics in our application. It can be costly for Phoenix Tracker to have a large number of joins in a very short period of time.
+The solution for PushEx is to allow certain topics to not use Tracker. When an ignored topic
+is &lt;a href="https://github.com/pushex-project/pushex/blob/62efb769e6bb3472f4b4635e9e98a5f6f1c346f7/lib/push_ex_web/channels/push_tracker.ex#L32" target="_blank"&gt;tracked&lt;/a&gt;
+or &lt;a href="https://github.com/pushex-project/pushex/blob/62efb769e6bb3472f4b4635e9e98a5f6f1c346f7/lib/push_ex_web/channels/push_tracker.ex#L43" target="_blank"&gt;questioned&lt;/a&gt;,
+it always responds with &lt;code&gt;true&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;The likelihood that a large topic has 0 connected clients is close to 0, so it is acceptable to treat it like it always has clients. We don&amp;rsquo;t
+want to treat small topics as if they always have connected clients, or we&amp;rsquo;d do more work than necessary.&lt;/p&gt;
+
+&lt;h2&gt;Keep-Alive to dramatically increase API throughput&lt;/h2&gt;
+
+&lt;p&gt;I was a bit shocked when I implemented the server API calls in our Ruby app. We were used to 20ms calls to our old provider, but the new
+one was hitting 200ms! We traced the root cause to DNS slowness when establishing the connection. The solution was to utilize Keep-Alive
+connection pooling.&lt;/p&gt;
+
+&lt;p&gt;The Keep-Alive header makes it so that the connection is not closed after a response is sent. The connection is open to accept more requests
+and can do so without the overhead of establishing a connection. This dramatically increased the throughput of our Ruby servers to the
+PushEx API endpoint. We didn&amp;rsquo;t quite hit the 20ms goal, but it was close enough to call it a win.&lt;/p&gt;
+
+&lt;p&gt;I did hit a snag here. The connection draining for Keep-Alive connections suffers from the same problem as WebSockets do&amp;mdash;they
+don&amp;rsquo;t close when the listener is closed. I had to do a bit of hackery to set a global value indicating that the Keep-Alive connection should
+be &lt;a href="https://github.com/pushex-project/pushex/blob/675c986acac5a06486d7b47e7b34e8289fda2d3b/lib/push_ex_web/controllers/push_controller.ex#L32" target="_blank"&gt;closed on the next request&lt;/a&gt;.
+This is a hack that I wish I didn&amp;rsquo;t have to do, but it did have the desired impact.&lt;/p&gt;
+
+&lt;h2&gt;Wrapping Up&lt;/h2&gt;
+
+&lt;p&gt;There were lots of challenges in rolling out the first major PushEx release, but the end result is solid. We&amp;rsquo;re running at pretty high throughput
+on a low number of small servers (2GB + 2VCPU for this app) without issue.&lt;/p&gt;
+
+&lt;p&gt;The snags we hit are not unique to our application. When building an Elixir application, you should consider both the startup and shutdown order
+of your process tree. Use connection draining to avoid new connections being made to a server that is in the process of shutting down. Leverage
+Keep-Alive headers for server-to-server API requests, especially if the throughput is high. These things do come with tradeoffs, however, so
+your mileage may vary.&lt;/p&gt;
+
+&lt;h2&gt;The Book Plug&lt;/h2&gt;
+
+&lt;p&gt;My book &amp;ldquo;Real-Time Phoenix: Build Highly Scalable Systems with Channels&amp;rdquo; is now in beta
+through &lt;a href="https://pragprog.com/book/sbsockets/real-time-phoenix" target="_blank"&gt;The Pragmatic Bookshelf&lt;/a&gt;. This book captures the victories and struggles that
+we face when building real-time applications in Elixir.&lt;/p&gt;
+
+&lt;div style="text-align: center"&gt;
+  &lt;a href="https://pragprog.com/book/sbsockets/real-time-phoenix" target="_blank"&gt;
     &lt;img src="/images/sbsockets.jpg" alt="Real-Time Phoenix by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" /&gt;
   &lt;/a&gt;
 &lt;/div&gt;
