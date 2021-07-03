@@ -140,6 +140,8 @@ iex(15)&gt; GenServer.call(pid, :get)
 
 <p>This is a very simple example, but the ability to control data over time is extremely powerful. We can build a key-value cache that clears out old keys to ensure our data footprint stays small. We can continually refresh a piece of data from our database and keep that data in memory for quick access. Things that we would usually introduce a third-party dependency for, we can just do ourselves.</p>
 
+<p>When I&rsquo;m working with GenServers, I often think of them as a living thing. They can change over time (in the constraints that I&rsquo;ve coded for them). They can emit messages to other GenServers in my system. They can be entirely contained or very sociable. They can exist for the duration of a web request, a WebSocket connection, or even exist as long as my system is up. I find that thinking of them in this way lets me build things that would be considered complex, but are very intuitive to develop and reason about.</p>
+
 <p>Okay, last thing about GenServers. Let&rsquo;s look at the concept of data independence.</p>
 
 <h2>Data Independence</h2>
@@ -166,7 +168,7 @@ iex(15)&gt; GenServer.call(pid, :get)
 
 <h2>Thanks</h2>
 
-<p>Thanks to Mitch Hanberg for reviewing this post. Check out <a href="https://www.mitchellhanberg.com" target="_blank">his blog!</a></p>
+<p>Thanks to <a href="https://www.mitchellhanberg.com" target="_blank">Mitch Hanberg</a>, <a href="https://keathley.io/" target="_blank">Chris Keathley</a>, and Jess for reviewing this post and helping me clarify a few things.</p>
 
 <h2>The Book Plug</h2>
 
