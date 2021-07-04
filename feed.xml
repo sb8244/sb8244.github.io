@@ -13,11 +13,11 @@
     <link rel="alternate" href="https://stephenbussey.com/2021/07/02/what-is-a-genserver.html"/>
     <id>https://stephenbussey.com/2021/07/02/what-is-a-genserver.html</id>
     <published>2021-07-02T12:00:00-04:00</published>
-    <updated>2021-07-03T09:40:31-04:00</updated>
+    <updated>2021-07-04T19:13:24-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
-    <content type="html">&lt;p&gt;GenServer is one of the most common tools in the Elixir toolbag. I&amp;rsquo;ve &lt;a href="/2018/02/03/bringing-elixir-to-others-new-language-vs-new-paradigm.html" target="_blank"&gt;written in the past&lt;/a&gt; about why you don&amp;rsquo;t need to know about GenServers to get started with Elixir. However, you will inevitably hit the point where you want (or need) them. This post will be my description of a GenServer to beginners to the language.&lt;/p&gt;
+    <content type="html">&lt;p&gt;GenServer (Generic Server) is one of the most common tools in the Elixir toolbag. I&amp;rsquo;ve &lt;a href="/2018/02/03/bringing-elixir-to-others-new-language-vs-new-paradigm.html" target="_blank"&gt;written in the past&lt;/a&gt; about why you don&amp;rsquo;t need to know about GenServers to get started with Elixir. However, you will inevitably hit the point where you want (or need) them. This post will be my description of a GenServer to beginners to the language.&lt;/p&gt;
 
 &lt;h2&gt;Data is the foundation of programming&lt;/h2&gt;
 
