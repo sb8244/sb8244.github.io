@@ -1,0 +1,189 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv='X-UA-Compatible' content='IE=edge;chrome=1' />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Stephen Bussey - React in LiveView: How and Why?</title>
+    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/feed.xml" />
+    <link href="/styles/style-b1c39cc4.css" rel="stylesheet" />
+    <link href="/styles/atom-one-light-eda63d8c.css" rel="stylesheet" />
+    <script src="/js/highlight.min-105fddac.js"></script>
+    <script src="/js/gist-embed-1aff2476.js"></script>
+  </head>
+  <body>
+    <header class="primary-header container">
+<a href="/">        <h1>
+          <span>Stephen Bussey</span>
+          <small>Elixir & Software Engineering</small>
+        </h1>
+</a>    </header>
+
+    <div id="main" role="main">
+        <div class="container" id="article-react-in-liveview-how-and-why%">
+    <article class="single-article">
+      <h1>React in LiveView: How and Why?</h1>
+      <p>I have been using LiveView daily for about 2 years now. It&rsquo;s honestly pretty much amazing for my needs. But, sometimes I have a complex need that already has a React library for it. Luckily, integrations between LiveView and React are pretty easy to setup.</p>
+
+<p>I&rsquo;m going to walk through what that looks like.</p>
+
+<h2>Use Case Examples (Why)</h2>
+
+<p>Let me set some foundation for what my application does, and where React/LiveView have been effective for me in the past.</p>
+
+<p>Clove customers use our backend UI (powered by LiveView) to do things like drag-and-drop elements onto a &ldquo;canvas&rdquo; (used in the creative sense), write content with a WYSIWYG editor, and bulk import data from CSVs. Of course, there&rsquo;s the boring things like list views, update forms, and other CRUD-like activities.</p>
+
+<p>Here&rsquo;s an example of our &ldquo;Success Space&rdquo; feature to show a use case for when I have used React. The entire editor is powered by the amazing <a href="https://github.com/react-grid-layout/react-grid-layout" target="_blank">React Grid Layout</a>. (This is not an sly ad for Clove, I just happened to have this video showing off the feature.)</p>
+
+<div style="max-width: 400px; margin: 0 auto; border: 1px solid #ccc;">
+  <div style="position: relative; padding-bottom: 62.5%; height: 0;"><iframe src="https://www.loom.com/embed/25dd9b0cab8e4d939ab48eafd77968b9" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe></div>
+</div>
+
+<p>I&rsquo;ve used React for this feature and the others mentioned above. I personally <em>don&rsquo;t</em> use React with client-side routes. I leave that in LiveView and just use React for components.</p>
+
+<h2>Guidelines for LiveView + React</h2>
+
+<p>I mention above that I don&rsquo;t use React client-side routes. It might be helpful for me to put out my ground &ldquo;rules&rdquo; for how I integrate the systems. These are not actual rules that you must follow, they&rsquo;re just guidelines that I follow to keep my integration clean.</p>
+
+<p>Also, I&rsquo;m sure there&rsquo;s more than these three guidelines. They&rsquo;re just things that came to mind as most important when thinking about this.</p>
+
+<h4>React components are leaf-nodes in the DOM</h4>
+
+<p>When integrating two frontend frameworks, I find that going back/forth between them is a recipe for disaster. For example, going LiveView -&gt; React -&gt; LiveView would likely be rough in the long run. So, I have a rule that React elements can&rsquo;t embed LiveView underneath them.</p>
+
+<h4>Bidirectional data flow should be over the WebSocket</h4>
+
+<p>Passing data back/forth from LiveView &lt;-&gt; React is an important part of useful applications. When I do this type of communication, I make sure to define a clean layer of actions that are available to the React application. You&rsquo;ll see this later in the article.</p>
+
+<p>I do not make HTTP API calls from my React components, and I would highly suggest avoiding that. I think it creates an increase of complexity that probably isn&rsquo;t worth it.</p>
+
+<h4>Think of React components as self-contained applications</h4>
+
+<p>When I&rsquo;m writing React components to be used in LiveView, I always think of them as completely self-contained. This means that I could take the component and put it somewhere else by simply defining the right props going into React.</p>
+
+<p>The benefit of this is that I can (and have) embed React applications built for other use cases (like a Chrome Extension) into my LiveView app very easily. Or I can take a React application built in LiveView and take it somewhere else with ease.</p>
+
+<h2>Embedding React Components</h2>
+
+<p>Okay, here&rsquo;s finally the meaty code-portion of the post. Here&rsquo;s the formula I follow for my React components. I use TypeScript as well, so you will see some of those annotations. I have broken this into two sections. The first for embedding the component and next how to pass data back and forth.</p>
+
+<h4>1. Define a hook / mounter that embeds the React application</h4>
+
+<p><a href="https://gist.github.com/sb8244/9d60231e1d13c177ec8de20d22b9ec8d?embed=1" target="_blank">View Gist</a></p>
+
+<p>This gist demonstrates what the LiveView hook might look like. Note that there&rsquo;s a <code>destroyed</code> function defined that cleans up the React application. Also, I use webpack chunks because it keeps my LiveView application JS small. You don&rsquo;t need to do this, but you&rsquo;d run the overhead of shipping your React component to every page, where it&rsquo;s not needed.</p>
+
+<h4>2. Embed a DOM element in LiveView referencing the hook</h4>
+
+<pre><code>&lt;div id=&quot;space-editor-instance&quot;
+     phx-hook=&quot;SpaceLayoutEditor&quot;
+     phx-update=&quot;ignore&quot;&gt;&lt;/div&gt;
+</code></pre>
+
+<p>Well look at that, pretty simple! Because we&rsquo;re leveraging LiveView hooks, all of the nitty gritty of when our hook is called is handled for us.</p>
+
+<p>It is important to use <code>phx-update=&quot;ignore&quot;</code>, otherwise LiveView&rsquo;s DOM management will be in conflict with the React DOM management. This leads to an important caveat though. If you do something like <code>data-important-thing={@from_live_view}</code>, then it will be available on first mount only! It would not get updated if the value changes, because the DOM updates are ignored.</p>
+
+<h4>You can embed anything</h4>
+
+<p>This approach isn&rsquo;t very complex, and largely works due to LiveView&rsquo;s hook system. It&rsquo;s also not really React specific. You could embed any JS &ldquo;component&rdquo; using this same approach, although the details would vary a bit.</p>
+
+<p>For example, I use Quill for my HTML WYSIWYG editor. I mount it almost the same way, but it&rsquo;s not a React-based library.</p>
+
+<h2>Data Flow</h2>
+
+<p>In the previous example, I alluded to ignored DOM updates causing some challenges with passing data using the DOM. In theory, you could mount a DOM element that is managed by LiveView and is &ldquo;watched&rdquo; by your application for value changes. I don&rsquo;t follow that approach, though.</p>
+
+<p>Instead, I leverage the data-flow bindings available in LiveView hooks. Here&rsquo;s the previous component with the data flow bindings included:</p>
+
+<p><a href="https://gist.github.com/sb8244/d1d2e05a6ef852c2ef5819b358e0a67e?embed=1" target="_blank">View gist</a></p>
+
+<h4>Receiving Data (LiveView to React)</h4>
+
+<p>For receiving data in the React app, I can simply leverage <code>this.handleEvent</code> in the LiveView hook. This will get triggered anytime the server pushes a message down. It will then &ldquo;re-mount&rdquo; the React component with new props.</p>
+
+<p>React is smart about this. When it sees that the component is being mounted but already exists, it will change the props but not destroy the application. The updates become very cheap to do.</p>
+
+<h4>Pushing Data (React to LiveView)</h4>
+
+<p>For pushing data from the React app, I leverage <code>pushEventTo</code>. I found <code>pushEvent</code> would sometimes push to the wrong element (when using components). I&rsquo;m not sure if that was an edge case I hit or standard operation, so I started using <code>pushEventTo</code> and being explicit about the element.</p>
+
+<p>I define an interface going from the LiveView hook to the React application. I would strongly suggest avoiding <code>pushEventTo</code> directly in React because it blurs the lines between the different frameworks. This would remove the ability to embed the React component in a different context, due to the implicit LiveView dependency.</p>
+
+<h2>Not That Complex</h2>
+
+<p>This whole thing is not very complex in practice. At its foundations, this pattern is following the basics of LiveView, Channels (data flow), and React. But, it is definitely challenging at first. Once you establish the pattern and see it working, it becomes an easy integration.</p>
+
+<p>Discipline comes into play here, then. If it&rsquo;s easy, it is also easy to abuse it and start embedding React components everywhere. I avoid this and will implement things in LiveView where possible. It&rsquo;s convenient for extremely complex problems that are solved by existing libraries, so I keep to that use case.</p>
+
+<p>In fact, I&rsquo;d say it&rsquo;s more than convenient. You can ship crazy things <strong>really fast</strong> because of it. I&rsquo;ve had ambitious ideas and then turned around a working prototype within 1-2 days. For example, we recently shipped a <a href="https://twitter.com/YOOOODAAAA/status/1510793570042757124" target="_blank">new CSV-based importer</a> that is built on an open-source React library. It took maybe three days total?</p>
+
+<h2>The Book Plug</h2>
+
+<p>My book &ldquo;Real-Time Phoenix: Build Highly Scalable Systems with Channels&rdquo; is available at <a href="https://bit.ly/rtp-gs-1" target="_blank">The Pragmatic Bookshelf</a>. This book explores using Phoenix Channels, GenStage, and more to build real-time applications in Elixir.</p>
+
+<p>It&rsquo;s been almost two years, is it still relevant? Understanding the foundations of Channels and data flow make building the things in this blog post way easier to ship and diagnose.</p>
+
+<div style="text-align: center">
+  <a href="https://bit.ly/rtp-gs-1" target="_blank">
+    <img src="/images/sbsockets.jpg" alt="Real-Time Phoenix by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" />
+  </a>
+</div>
+
+
+      <div class="tags-listing">
+        <span>View other posts tagged:</span>
+          <a href="/tags/elixir.html">elixir</a>
+      </div>
+
+      <div class="signup-footer">
+        <div class="mc_embed_signup">
+  <form action="https://stephenbussey.us7.list-manage.com/subscribe/post?u=7fb9f680ade7d30e88b6d6f57&amp;id=50e64e60ba" method="post" name="mc-embedded-subscribe-form" class="validate mc-embedded-subscribe-form" target="_blank">
+    <div class="mc_embed_signup_scroll">
+      <input type="email" value="" name="EMAIL" class="email mce-EMAIL" placeholder="email address" required>
+
+      <div style="position: absolute; left: -5000px;" aria-hidden="true">
+        <input type="text" name="b_7fb9f680ade7d30e88b6d6f57_50e64e60ba" tabindex="-1" value="">
+      </div>
+
+      <div class="clear">
+        <input type="submit" value="Subscribe to get updates" name="subscribe" class="mc-embedded-subscribe button">
+      </div>
+    </div>
+  </form>
+</div>
+
+      </div>
+    </article>
+  </div>
+
+    </div>
+
+    <script>
+      hljs.initHighlightingOnLoad();
+
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-32263345-1', 'auto');
+      ga('send', 'pageview');
+
+      if (window.GistEmbed) {
+        document.querySelectorAll("a").forEach((link) => {
+          if (link.href.startsWith("https://gist.github.com") && link.href.indexOf("embed=1") > -1) {
+            const url = new URL(link.href);
+            const splitPath = url.pathname.split("/")
+            var script = document.createElement('code');
+            script.setAttribute("data-gist-id", splitPath[splitPath.length - 1]);
+            link.replaceWith(script);
+          }
+        })
+
+        window.GistEmbed.init()
+      }
+    </script>
+  </body>
+</html>
