@@ -130,7 +130,7 @@
     <link rel="alternate" href="https://stephenbussey.com/2021/07/02/what-is-a-genserver.html"/>
     <id>https://stephenbussey.com/2021/07/02/what-is-a-genserver.html</id>
     <published>2021-07-02T12:00:00-04:00</published>
-    <updated>2022-04-14T23:20:40-04:00</updated>
+    <updated>2023-06-14T10:45:20-04:00</updated>
     <author>
       <name>Stephen Bussey</name>
     </author>
@@ -283,14 +283,11 @@ iex(15)&amp;gt; GenServer.call(pid, :get)
 
 &lt;h2&gt;The Book Plug&lt;/h2&gt;
 
-&lt;p&gt;My book &amp;ldquo;Real-Time Phoenix: Build Highly Scalable Systems with Channels&amp;rdquo; is available at &lt;a href="https://pragprog.com/titles/sbsockets/real-time-phoenix/" target="_blank"&gt;The Pragmatic Bookshelf&lt;/a&gt;. This book explores using Phoenix Channels, GenStage, and more to build
-real-time applications in Elixir.&lt;/p&gt;
-
-&lt;p&gt;I worked really hard to keep the material friendly to people that are new to Elixir and relevant for experienced Elixirists.&lt;/p&gt;
+&lt;p&gt;My book &amp;ldquo;From Ruby to Elixir&amp;rdquo; is available (beta) at &lt;a href="https://pragprog.com/titles/sbelixir/from-ruby-to-elixir/" target="_blank"&gt;The Pragmatic Bookshelf&lt;/a&gt;. This book teaches you Elixir and key libraries you need to write Elixir web apps.&lt;/p&gt;
 
 &lt;div style="text-align: center"&gt;
-  &lt;a href="https://pragprog.com/titles/sbsockets/real-time-phoenix/" target="_blank"&gt;
-    &lt;img src="/images/sbsockets.jpg" alt="Real-Time Phoenix by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" /&gt;
+  &lt;a href="https://pragprog.com/titles/sbelixir/from-ruby-to-elixir/" target="_blank"&gt;
+    &lt;img src="/images/ruby-to-elixir.jpeg" alt="From Ruby to Elixir by The Pragmatic Bookshelf" height="300px" style="border: 1px solid #ccc" /&gt;
   &lt;/a&gt;
 &lt;/div&gt;
 </content>
